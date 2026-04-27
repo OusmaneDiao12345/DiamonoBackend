@@ -127,7 +127,7 @@ app.post('/api/payments/create', verifyFirebaseToken, async (req, res) => {
     const { amount, description, phone, orderId } = req.body;
     const userId = req.user.uid;
 
-    if (!amount || amount <= 0 || !phone || !orderId) {
+    if (!amount || amount <= 0 || !orderId) {
         return res.status(400).json({ error: 'Paramètres manquants' });
     }
 
@@ -135,45 +135,64 @@ app.post('/api/payments/create', verifyFirebaseToken, async (req, res) => {
         const paymentData = {
             amount: Math.round(amount),
             currency: 'XOF',
-            phone: phone,
             description: description || `Paiement commande ${orderId}`,
-            orderId: orderId,
-            userId: userId,
-            returnUrl: `${process.env.FRONTEND_URL}/payment-success`,
-            cancelUrl: `${process.env.FRONTEND_URL}/payment-cancel`
+            orderReference: orderId,
+            metadata: { userId, phone },
+            successUrl: `${process.env.FRONTEND_URL}/payment-success`,
+            cancelUrl: `${process.env.FRONTEND_URL}/payment-cancel`,
+            webhookUrl: SENEPAY_CONFIG.webhookUrl
         };
 
+        console.log('🚀 Envoi à SenePay:', SENEPAY_CONFIG.baseUrl + '/checkout/sessions');
+
         const response = await axios.post(
-            `${SENEPAY_CONFIG.baseUrl}/transactions/create`,
+            `${SENEPAY_CONFIG.baseUrl}/checkout/sessions`,
             paymentData,
             {
                 headers: {
-                    'Authorization': `Bearer ${SENEPAY_CONFIG.apiKey}`,
-                    'X-API-Secret': SENEPAY_CONFIG.apiSecret,
-                    'Content-Type': 'application/json'
-                }
+                    'Content-Type': 'application/json',
+                    'X-Api-Key': SENEPAY_CONFIG.apiKey,
+                    'X-Api-Secret': SENEPAY_CONFIG.apiSecret
+                },
+                timeout: 15000
             }
         );
 
-        // Sauvegarder la transaction dans Firestore
-        await db.collection('payments').doc(response.data.transactionId).set({
+        console.log('🔍 Réponse brute SenePay:', JSON.stringify(response.data, null, 2));
+
+        let data = response.data?.data || response.data || {};
+        if (typeof data === 'string') {
+            const trimmed = data.trim();
+            if (trimmed.startsWith('http')) {
+                data = { checkoutUrl: trimmed };
+            } else {
+                data = {};
+            }
+        }
+
+        const sessionToken = data.sessionToken || data.session_token || data.token || null;
+        const checkoutUrl  = data.checkoutUrl  || data.checkout_url  || data.checkout || data.url || null;
+
+        const docId = sessionToken || db.collection('payments').doc().id;
+        await db.collection('payments').doc(docId).set({
             userId: userId,
             orderId: orderId,
             amount: amount,
-            phone: phone,
             status: 'pending',
-            transactionId: response.data.transactionId,
+            sessionToken: sessionToken,
+            checkoutUrl: checkoutUrl,
             createdAt: new Date().toISOString(),
             senepayResponse: response.data
         });
 
         res.json({
             success: true,
-            transactionId: response.data.transactionId,
-            paymentUrl: response.data.paymentUrl
+            sessionToken: sessionToken,
+            checkoutUrl: checkoutUrl,
+            redirectUrl: checkoutUrl  // ✅ Alias pour le client
         });
     } catch (error) {
-        console.error('Senepay error:', error.response?.data || error.message);
+        console.error('Senepay error:', error.response?.status, error.response?.data || error.message);
         res.status(500).json({ 
             error: 'Erreur lors de la création du paiement',
             details: error.response?.data?.message || error.message
@@ -182,8 +201,194 @@ app.post('/api/payments/create', verifyFirebaseToken, async (req, res) => {
 });
 
 /**
+ * POST /api/payment/initiate
+ * Créer une transaction de paiement (interface client frontend)
+ * ✅ Cette route est appelée directement par le client HTML
+ */
+app.post('/api/payment/initiate', async (req, res) => {
+    if (!hasSenePayCredentials()) {
+        return res.status(503).json({ 
+            success: false,
+            message: 'Senepay non configuré sur le serveur',
+            error: 'Senepay non disponible'
+        });
+    }
+
+    const { amount, orderReference, customerName, customerPhone, returnUrl } = req.body;
+
+    // Validations
+    if (!amount || amount <= 0) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Montant invalide' 
+        });
+    }
+
+    if (!customerPhone) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Numéro de téléphone manquant' 
+        });
+    }
+
+    try {
+        console.log('📱 Initiation paiement SenePay:', {
+            amount,
+            orderReference,
+            customerPhone,
+            customerName
+        });
+
+        // Préparer les données pour SenePay (conformes à la doc /checkout/sessions)
+        const paymentPayload = {
+            amount: Math.round(amount),
+            currency: 'XOF',
+            orderReference: orderReference,
+            description: `Commande ${orderReference} - ${customerName}`,
+            metadata: { customerName },
+            successUrl: returnUrl || `${process.env.FRONTEND_URL}/payment-success`,
+            cancelUrl: `${process.env.FRONTEND_URL}/payment-cancel`,
+            webhookUrl: SENEPAY_CONFIG.webhookUrl,
+            expiresInMinutes: 60
+        };
+
+        console.log('🚀 Envoi à SenePay:', SENEPAY_CONFIG.baseUrl + '/checkout/sessions');
+        console.log('📦 Payload envoyé:', JSON.stringify(paymentPayload, null, 2));
+
+        // Appel à l'API SenePay
+        const response = await axios.post(
+            `${SENEPAY_CONFIG.baseUrl}/checkout/sessions`,
+            paymentPayload,
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Api-Key': SENEPAY_CONFIG.apiKey,
+                    'X-Api-Secret': SENEPAY_CONFIG.apiSecret
+                },
+                timeout: 15000
+            }
+        );
+
+        // ✅ CORRECTION PRINCIPALE : Log de la réponse brute complète
+        console.log('🔍 Réponse brute SenePay:', JSON.stringify(response.data, null, 2));
+
+        // Normaliser la réponse attendue (/checkout/sessions)
+        let data = response.data?.data || response.data || {};
+        if (typeof data === 'string') {
+            const trimmed = data.trim();
+            if (trimmed.startsWith('http')) {
+                data = { checkoutUrl: trimmed };
+            } else {
+                data = {};
+            }
+        }
+
+        const sessionToken = data.sessionToken || data.session_token || data.session || null;
+        const checkoutUrl  = data.checkoutUrl  || data.checkout_url  || data.checkout || data.url || null;
+
+        console.log('✅ Champs extraits:', { sessionToken, checkoutUrl });
+
+        if (!checkoutUrl) {
+            console.error('❌ Aucune URL de redirection trouvée dans la réponse SenePay');
+            console.error('❌ Clés disponibles dans response.data:', Object.keys(response.data));
+            return res.status(502).json({
+                success: false,
+                message: 'Réponse SenePay invalide : URL de redirection manquante',
+                error: 'bad_senepay_response',
+                debug: {
+                    availableKeys: Object.keys(response.data),
+                    rawData: response.data
+                }
+            });
+        }
+
+        // Retourner au client (sessionToken + checkoutUrl attendu)
+        res.json({
+            success: true,
+            sessionToken: sessionToken,
+            checkoutUrl: checkoutUrl,
+            redirectUrl: checkoutUrl,
+            message: 'Paiement initié avec succès'
+        });
+
+    } catch (error) {
+        // ✅ Log d'erreur détaillé
+        console.error('❌ Erreur SenePay complète:', {
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            data: JSON.stringify(error.response?.data, null, 2),
+            message: error.message,
+            headers: error.response?.headers
+        });
+
+        res.status(error.response?.status || 500).json({
+            success: false,
+            message: error.response?.data?.message
+                  || error.response?.data?.error
+                  || error.message
+                  || 'Erreur lors de l\'initiation du paiement',
+            error: 'payment_initiation_failed',
+            details: error.response?.data || null
+        });
+    }
+});
+
+/**
+ * GET /api/payment/check/:sessionToken
+ * Vérifier le statut d'une session de paiement (public - pas d'auth)
+ * ✅ Utilisé par le frontend pour vérifier après checkout
+ */
+app.get('/api/payment/check/:sessionToken', async (req, res) => {
+    if (!hasSenePayCredentials()) {
+        return res.status(503).json({ 
+            success: false,
+            message: 'Senepay non configuré'
+        });
+    }
+
+    try {
+        const { sessionToken } = req.params;
+        console.log('🔍 Vérification statut session:', sessionToken);
+
+        const response = await axios.get(
+            `${SENEPAY_CONFIG.baseUrl}/checkout/sessions/${sessionToken}`,
+            {
+                headers: {
+                    'X-Api-Key': SENEPAY_CONFIG.apiKey,
+                    'X-Api-Secret': SENEPAY_CONFIG.apiSecret
+                },
+                timeout: 10000
+            }
+        );
+
+        const data = response.data?.data || response.data;
+        const status = data.status || data.sessionStatus || 'unknown';
+
+        console.log('✅ Statut reçu:', { sessionToken, status });
+
+        res.json({
+            success: true,
+            sessionToken: sessionToken,
+            status: status,
+            amount: data.amount,
+            currency: data.currency,
+            orderReference: data.orderReference,
+            createdAt: data.createdAt,
+            expiresAt: data.expiresAt
+        });
+    } catch (error) {
+        console.error('❌ Erreur vérification statut:', error.response?.status, error.response?.data || error.message);
+        res.status(error.response?.status || 500).json({
+            success: false,
+            message: 'Erreur lors de la vérification du statut',
+            details: error.response?.data?.error || error.message
+        });
+    }
+});
+
+/**
  * GET /api/payments/status/:transactionId
- * Vérifier le statut d'une transaction
+ * Vérifier le statut d'une transaction (protégé Firebase)
  */
 app.get('/api/payments/status/:transactionId', verifyFirebaseToken, async (req, res) => {
     if (!hasSenePayCredentials()) {
@@ -194,26 +399,30 @@ app.get('/api/payments/status/:transactionId', verifyFirebaseToken, async (req, 
         const { transactionId } = req.params;
 
         const response = await axios.get(
-            `${SENEPAY_CONFIG.baseUrl}/transactions/${transactionId}`,
+            `${SENEPAY_CONFIG.baseUrl}/checkout/sessions/${transactionId}`,
             {
                 headers: {
-                    'Authorization': `Bearer ${SENEPAY_CONFIG.apiKey}`,
-                    'X-API-Secret': SENEPAY_CONFIG.apiSecret
+                    'X-Api-Key': SENEPAY_CONFIG.apiKey,
+                    'X-Api-Secret': SENEPAY_CONFIG.apiSecret
                 }
             }
         );
 
+        // ✅ CORRECTION : Extraction flexible du statut
+        const data = response.data?.data || response.data;
+        const status = data.status || data.transaction_status || data.state || 'unknown';
+
         // Mettre à jour le statut dans Firestore
         await db.collection('payments').doc(transactionId).update({
-            status: response.data.status,
+            status: status,
             lastChecked: new Date().toISOString()
         });
 
         res.json({
             transactionId: transactionId,
-            status: response.data.status,
-            amount: response.data.amount,
-            phone: response.data.phone
+            status: status,
+            amount: data.amount,
+            phone: data.phone
         });
     } catch (error) {
         console.error('Senepay status error:', error.response?.data || error.message);
@@ -230,28 +439,33 @@ app.get('/api/payments/status/:transactionId', verifyFirebaseToken, async (req, 
  */
 app.post('/api/webhooks/senepay', async (req, res) => {
     try {
-        const { transactionId, status, amount, phone } = req.body;
+        console.log('📩 Webhook SenePay reçu:', JSON.stringify(req.body, null, 2));
 
-        if (!transactionId) {
+        const body = req.body?.data || req.body;
+        const sessionToken  = body.sessionToken || body.session_token || body.session || null;
+        const transactionId = body.transactionId || body.transaction_id || body.id || null;
+        const status        = body.status || body.transaction_status || body.state || body.event || null;
+
+        const docId = sessionToken || transactionId;
+        if (!docId) {
             return res.status(400).json({ error: 'Transaction ID manquant' });
         }
 
-        // Mettre à jour Firestore avec le statut
-        await db.collection('payments').doc(transactionId).update({
+        await db.collection('payments').doc(docId).update({
             status: status,
-            webhookReceivedAt: new Date().toISOString()
+            webhookReceivedAt: new Date().toISOString(),
+            senepayWebhook: body
         });
 
-        // Si paiement confirmé, mettre à jour la commande
-        if (status === 'completed' || status === 'successful') {
-            const paymentDoc = await db.collection('payments').doc(transactionId).get();
+        if (status && ['completed','Completed','complete','Complete','successful','success','paid'].includes(String(status))) {
+            const paymentDoc = await db.collection('payments').doc(docId).get();
             if (paymentDoc.exists) {
                 const { orderId } = paymentDoc.data();
                 if (orderId) {
                     await db.collection('orders').doc(orderId).update({
                         paymentStatus: 'paid',
                         paymentDate: new Date().toISOString(),
-                        transactionId: transactionId
+                        transactionId: transactionId || docId
                     });
                 }
             }
@@ -293,7 +507,113 @@ app.get('/api/payments/user', verifyFirebaseToken, async (req, res) => {
 });
 
 // ==========================================
-// � INITIALISER FIRESTORE (Admin only)
+// � AUTHENTICATION ROUTES
+// ==========================================
+
+/**
+ * POST /api/register
+ * Créer un nouvel utilisateur avec Firebase Authentication
+ */
+app.post('/api/register', async (req, res) => {
+    const { name, phone, email, password } = req.body;
+
+    // Validations
+    if (!email || !password || !name) {
+        return res.status(400).json({ error: 'Email, mot de passe et nom requis' });
+    }
+
+    if (password.length < 6) {
+        return res.status(400).json({ error: 'Mot de passe trop court (min. 6 caractères)' });
+    }
+
+    try {
+        // Créer l'utilisateur dans Firebase Authentication
+        const userRecord = await auth.createUser({
+            email: email.trim(),
+            password: password,
+            displayName: name.trim(),
+            phoneNumber: phone ? `+221${phone.replace(/^221|\+221/, '')}` : undefined
+        });
+
+        // Sauvegarder les infos utilisateur dans Firestore
+        await db.collection('users').doc(userRecord.uid).set({
+            uid: userRecord.uid,
+            name: name.trim(),
+            phone: phone?.trim() || '',
+            email: email.trim(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        });
+
+        // Créer un token personnalisé pour le client
+        const customToken = await auth.createCustomToken(userRecord.uid);
+
+        res.json({
+            id: userRecord.uid,
+            name: name.trim(),
+            phone: phone?.trim() || '',
+            email: email.trim(),
+            token: customToken
+        });
+
+    } catch (error) {
+        console.error('Register error:', error.message);
+        
+        // Messages d'erreur Firebase
+        if (error.code === 'auth/email-already-exists') {
+            return res.status(409).json({ error: 'Cet email est déjà utilisé' });
+        }
+        if (error.code === 'auth/invalid-email') {
+            return res.status(400).json({ error: 'Email invalide' });
+        }
+        
+        res.status(500).json({ error: 'Erreur lors de l\'inscription: ' + error.message });
+    }
+});
+
+/**
+ * POST /api/login
+ * Connecter un utilisateur avec Firebase Authentication
+ */
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Email et mot de passe requis' });
+    }
+
+    try {
+        // Chercher l'utilisateur par email
+        const userRecord = await auth.getUserByEmail(email.trim());
+
+        // Récupérer les infos supplémentaires depuis Firestore
+        const userDoc = await db.collection('users').doc(userRecord.uid).get();
+        const userData = userDoc.data() || {};
+
+        // Créer un token personnalisé
+        const customToken = await auth.createCustomToken(userRecord.uid);
+
+        res.json({
+            id: userRecord.uid,
+            name: userData.name || userRecord.displayName || '',
+            phone: userData.phone || '',
+            email: userRecord.email,
+            token: customToken
+        });
+
+    } catch (error) {
+        console.error('Login error:', error.message);
+        
+        if (error.code === 'auth/user-not-found') {
+            return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+        }
+        
+        res.status(500).json({ error: 'Erreur lors de la connexion' });
+    }
+});
+
+// ==========================================
+// �🗄️ INITIALISER FIRESTORE (Admin only)
 // ==========================================
 const initialProducts = [
     { id: 1, name: 'Samsung Galaxy A54 5G 128Go', cat: 'Électronique', brand: 'Samsung', price: 189000, oldPrice: 239000, rating: 4.5, reviews: 284, image: 'https://i.roamcdn.net/hz/ed/listing-gallery-full-1920w/acd777160bac6c8b22024453025cdef0/-/horizon-files-prod/ed/picture/qxjgj2qz/2ff87a27a8281733562188a0a523ae0604c80efb.jpg', badge: 'hot', desc: 'Écran 6.4" AMOLED 120Hz, 128Go, 5000mAh, Android 14. Garantie 1 an.', tags: 'Smartphone,5G,Samsung' },
@@ -369,7 +689,7 @@ app.post('/api/init/products', async (req, res) => {
 });
 
 // ==========================================
-// �🏥 HEALTH CHECK
+// 🏥 HEALTH CHECK
 // ==========================================
 app.get('/api/health', (req, res) => {
     res.json({
