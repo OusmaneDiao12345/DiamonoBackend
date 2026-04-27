@@ -5117,11 +5117,11 @@ function renderCartPanel(){
           <span class="ci-unit">/ unité</span>
         </div>
         <div class="ci-actions">
-          <button class="qty-btn" onclick="changeQty(${c.id},-1)">−</button>
+          <button class="qty-btn" onclick="changeQty('${c.id}',-1)">−</button>
           <span class="qty-n">${c.qty}</span>
-          <button class="qty-btn" onclick="changeQty(${c.id},1)">+</button>
+          <button class="qty-btn" onclick="changeQty('${c.id}',1)">+</button>
           <span class="ci-subtotal">= ${fmtPrice(lineTotal)}</span>
-          <button class="ci-del" onclick="removeFromCart(${c.id})" title="Supprimer">🗑️</button>
+          <button class="ci-del" onclick="removeFromCart('${c.id}')" title="Supprimer">🗑️</button>
         </div>
       </div>
     </div>`;
@@ -5596,7 +5596,7 @@ function openProdModal(id){
         </div>
         <div class="modal-tags">${(p.tags||[]).map(t=>`<span class="modal-tag">${t}</span>`).join('')}</div>
         <div class="modal-btns">
-          <button class="modal-btn-cart" onclick="addToCartFromModal(${p.id})">🛒 Ajouter au panier</button>
+          <button class="modal-btn-cart" onclick="addToCartFromModal('${p.id}')">🛒 Ajouter au panier</button>
           <button class="modal-btn-wish ${inWishlist?'active':''}" onclick="toggleWishFromModal(${p.id})">❤️ ${inWishlist?'Dans les favoris':'Ajouter aux favoris'}</button>
         </div>
         <div style="font-size:13px;color:var(--muted);display:flex;gap:16px;margin-top:8px;flex-wrap:wrap;">
