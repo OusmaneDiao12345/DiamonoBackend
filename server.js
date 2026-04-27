@@ -953,6 +953,7 @@ app.post('/api/contact', async (req, res) => {
 app.get('/api/health', (req, res) => {
     res.json({
         status: 'ok',
+        version: '1.1.0-contact-api',
         timestamp: new Date().toISOString(),
         firebase: admin.apps.length > 0 ? 'connected' : 'disconnected',
         senepay: hasSenePayCredentials() ? 'configured' : 'not-configured'
