@@ -4,6 +4,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const axios = require('axios');
 const path = require('path');
+const nodemailer = require('nodemailer');
 
 // Firebase Admin SDK
 const admin = require('firebase-admin');
@@ -58,6 +59,106 @@ function hasSenePayCredentials() {
 
 if (!hasSenePayCredentials()) {
     console.warn('⚠️  SenePay non configuré: ajoutez SENEPAY_API_KEY et SENEPAY_API_SECRET dans .env');
+}
+
+// ==========================================
+// 📧 CONFIGURATION EMAIL (BREVO - SMTP)
+// ==========================================
+const ADMIN_EMAIL = 'ousmoneebah12@gmail.com';
+
+// Configuration pour Brevo (ou Gmail alternative)
+let emailTransporter;
+
+if (process.env.EMAIL_SERVICE === 'brevo' && process.env.BREVO_API_KEY) {
+    // Configuration BREVO
+    emailTransporter = nodemailer.createTransport({
+        host: 'smtp-relay.brevo.com',
+        port: 587,
+        secure: false,
+        auth: {
+            user: 'postmaster@diamanosn.sn',
+            pass: process.env.BREVO_API_KEY
+        }
+    });
+    console.log('✅ Email sender (Brevo) initialized');
+} else if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+    // Configuration GMAIL (fallback)
+    emailTransporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASSWORD
+        }
+    });
+    console.log('✅ Email sender (Gmail) initialized');
+} else {
+    console.warn('⚠️  Email non configuré: ajoutez BREVO_API_KEY ou EMAIL_USER/EMAIL_PASSWORD dans .env');
+}
+
+// Fonction pour envoyer des emails
+async function sendEmail(to, subject, htmlContent) {
+    try {
+        if (!emailTransporter) {
+            console.error('❌ Email transporter non configuré');
+            return false;
+        }
+
+        const mailOptions = {
+            from: ADMIN_EMAIL,
+            to: to,
+            subject: subject,
+            html: htmlContent
+        };
+        
+        const info = await emailTransporter.sendMail(mailOptions);
+        console.log('✅ Email envoyé:', info.response);
+        return true;
+    } catch (error) {
+        console.error('❌ Erreur envoi email:', error.message);
+        return false;
+    }
+}
+
+// ==========================================
+// 📧 FONCTION NEWSLETTER (BREVO API REST)
+// ==========================================
+async function subscribeToNewsletter(email, firstName = '', lastName = '') {
+    try {
+        if (!process.env.BREVO_API_KEY) {
+            console.warn('⚠️  BREVO_API_KEY non configuré - newsletter désactivée');
+            return false;
+        }
+
+        const brevoAPI = axios.create({
+            baseURL: 'https://api.brevo.com/v3',
+            headers: {
+                'api-key': process.env.BREVO_API_KEY,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // Ajouter/mettre à jour le contact dans Brevo
+        const response = await brevoAPI.post('/contacts', {
+            email: email,
+            attributes: {
+                FIRSTNAME: firstName || 'Abonné',
+                LASTNAME: lastName || 'DiamanoSN',
+                SOURCE: 'Website Newsletter'
+            },
+            listIds: [process.env.BREVO_LIST_ID || 1], // ID de la liste par défaut
+            updateEnabled: true
+        });
+
+        console.log('✅ Contact ajouté à la newsletter Brevo:', email);
+        return true;
+    } catch (error) {
+        if (error.response?.status === 400 && error.response?.data?.message?.includes('already exists')) {
+            console.log('ℹ️  Email déjà abonné:', email);
+            return true; // Pas d'erreur si déjà existant
+        }
+        console.error('❌ Erreur ajout newsletter:', error.response?.data || error.message);
+        return false;
+    }
 }
 
 // ==========================================
@@ -720,7 +821,7 @@ app.post('/api/init/products', async (req, res) => {
  */
 app.post('/api/orders/create', async (req, res) => {
     try {
-        const { userId, items, totalAmount, address, paymentMethod, customerName, customerPhone } = req.body;
+        const { userId, items, totalAmount, address, paymentMethod, customerName, customerPhone, customerEmail } = req.body;
 
         // Validations
         if (!userId || !items || items.length === 0 || !totalAmount) {
@@ -742,6 +843,7 @@ app.post('/api/orders/create', async (req, res) => {
             paymentStatus: 'pending',
             customerName: customerName || '',
             customerPhone: customerPhone || '',
+            customerEmail: customerEmail || '',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             notes: ''
@@ -751,12 +853,107 @@ app.post('/api/orders/create', async (req, res) => {
 
         console.log('✅ Commande créée:', orderRef, 'ID:', orderId.id);
 
+        // ===== ENVOI D'EMAILS =====
+        // 1. Email à l'ADMIN
+        const adminEmailContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+                <h2 style="color: #0d9488; text-align: center;">🎉 Nouvelle Commande Reçue!</h2>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                    <p><strong>Référence:</strong> ${orderRef}</p>
+                    <p><strong>ID Commande:</strong> ${orderId.id}</p>
+                    <p><strong>Client:</strong> ${customerName}</p>
+                    <p><strong>Téléphone:</strong> ${customerPhone}</p>
+                    <p><strong>Email:</strong> ${customerEmail}</p>
+                    <p><strong>Adresse:</strong> ${address || 'Non spécifiée'}</p>
+                    <p><strong>Montant:</strong> ${totalAmount.toLocaleString('fr-SN')} FCFA</p>
+                    <p><strong>Méthode Paiement:</strong> ${paymentMethod === 'senepay' ? '💳 SenePay' : '🚚 À la livraison'}</p>
+                </div>
+
+                <h3 style="color: #0d9488; margin-top: 20px;">📦 Articles Commandés:</h3>
+                <ul style="background: #f0fdf4; padding: 15px; border-radius: 6px;">
+                    ${items.map(item => `
+                        <li style="margin: 8px 0;">
+                            <strong>${item.name}</strong> x${item.qty} = ${(item.price * item.qty).toLocaleString('fr-SN')} FCFA
+                        </li>
+                    `).join('')}
+                </ul>
+
+                <div style="margin-top: 20px; padding: 15px; background: #fef3c7; border-radius: 6px; border-left: 4px solid #f59e0b;">
+                    <p style="margin: 0;"><strong>⚠️ Action requise:</strong> Préparer la commande et attendre le paiement SenePay si applicable.</p>
+                </div>
+
+                <p style="color: #666; text-align: center; margin-top: 30px; font-size: 12px;">
+                    DiamanoSN © 2026
+                </p>
+            </div>
+        `;
+
+        // 2. Email au CLIENT
+        const clientEmailContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h2 style="color: #0d9488; margin: 0;">✅ Commande Confirmée!</h2>
+                    <p style="color: #666; margin-top: 5px;">Merci d'avoir choisi DiamanoSN</p>
+                </div>
+
+                <div style="background: #f0fdf4; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                    <p style="margin: 8px 0;"><strong>📦 Votre Commande:</strong> <span style="color: #0d9488; font-weight: bold;">${orderRef}</span></p>
+                    <p style="margin: 8px 0;"><strong>👤 Bonjour ${customerName},</strong></p>
+                    <p style="margin: 8px 0;"><strong>💰 Total:</strong> ${totalAmount.toLocaleString('fr-SN')} FCFA</p>
+                </div>
+
+                <h3 style="color: #0d9488;">📋 Détails de votre Commande:</h3>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                    <thead>
+                        <tr style="background: #0d9488; color: white;">
+                            <th style="padding: 12px; text-align: left;">Produit</th>
+                            <th style="padding: 12px; text-align: center;">Qté</th>
+                            <th style="padding: 12px; text-align: right;">Prix</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map((item, idx) => `
+                            <tr style="border-bottom: 1px solid #eee; ${idx % 2 === 0 ? 'background: #f8fafc;' : ''}">
+                                <td style="padding: 12px;">${item.name}</td>
+                                <td style="padding: 12px; text-align: center;">${item.qty}</td>
+                                <td style="padding: 12px; text-align: right;">${(item.price * item.qty).toLocaleString('fr-SN')} FCFA</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <div style="background: #eff6ff; padding: 15px; border-radius: 6px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+                    <p style="margin: 0; color: #1e40af;"><strong>💳 Prochaines Étapes:</strong></p>
+                    <p style="margin: 8px 0; color: #1e40af;">Vous recevrez bientôt un email avec le lien de paiement sécurisé SenePay.</p>
+                    <p style="margin: 8px 0; color: #1e40af;">Une fois le paiement confirmé, votre commande sera traitée rapidement.</p>
+                </div>
+
+                <div style="background: #fef3c7; padding: 15px; border-radius: 6px; border-left: 4px solid #f59e0b; margin: 20px 0;">
+                    <p style="margin: 0;"><strong>📞 Besoin d'aide?</strong></p>
+                    <p style="margin: 8px 0;">Contactez-nous sur WhatsApp: <a href="https://wa.me/221773632458" style="color: #0d9488; text-decoration: none;">+221 77 363 24 58</a></p>
+                </div>
+
+                <p style="color: #666; text-align: center; margin-top: 30px; font-size: 12px;">
+                    © 2026 DiamanoSN - Le Grand Bazar du Sénégal
+                </p>
+            </div>
+        `;
+
+        // Envoyer les emails en arrière-plan
+        sendEmail(ADMIN_EMAIL, `🎉 Nouvelle Commande: ${orderRef}`, adminEmailContent);
+        
+        if (customerEmail) {
+            sendEmail(customerEmail, `✅ Commande Confirmée - ${orderRef}`, clientEmailContent);
+        }
+
         res.json({
             success: true,
             orderId: orderId.id,
             orderRef: orderRef,
             totalAmount: totalAmount,
-            paymentMethod: paymentMethod
+            paymentMethod: paymentMethod,
+            message: 'Commande créée et emails envoyés'
         });
     } catch (error) {
         console.error('Order creation error:', error.message);
@@ -943,6 +1140,63 @@ app.post('/api/contact', async (req, res) => {
         res.status(500).json({ 
             success: false, 
             error: 'Erreur lors de l\'envoi du message'
+        });
+    }
+});
+
+// ==========================================
+// 📬 NEWSLETTER SUBSCRIPTION
+// ==========================================
+app.post('/api/newsletter/subscribe', async (req, res) => {
+    try {
+        const { email, firstName = '', lastName = '' } = req.body;
+
+        // Validations
+        if (!email || !email.includes('@')) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Email valide requis'
+            });
+        }
+
+        // Ajouter le contact à Brevo
+        const subscribed = await subscribeToNewsletter(
+            email.trim().toLowerCase(),
+            firstName.trim() || '',
+            lastName.trim() || ''
+        );
+
+        if (!subscribed) {
+            return res.status(500).json({ 
+                success: false, 
+                error: 'Erreur lors de l\'abonnement à la newsletter'
+            });
+        }
+
+        // Sauvegarder aussi dans Firestore pour tracking
+        const subscriberData = {
+            email: email.trim().toLowerCase(),
+            firstName: firstName.trim() || 'Abonné',
+            lastName: lastName.trim() || 'DiamanoSN',
+            subscribedAt: new Date().toISOString(),
+            source: 'website',
+            ip: req.ip || 'unknown'
+        };
+
+        await db.collection('newsletter_subscribers').doc(email.trim().toLowerCase()).set(subscriberData, { merge: true });
+
+        console.log('✅ Nouveau subscriber newsletter:', email);
+
+        res.json({
+            success: true,
+            message: 'Merci! Vous êtes maintenant abonné à notre newsletter.',
+            email: email.trim().toLowerCase()
+        });
+    } catch (error) {
+        console.error('Newsletter subscription error:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erreur lors de l\'abonnement'
         });
     }
 });

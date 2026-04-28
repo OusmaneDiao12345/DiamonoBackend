@@ -235,7 +235,11 @@ header{
 }
 
 /* ========== MOBILE SEARCH BAR ========== */
-.mobile-search{display:none;padding:12px;background:#fff;border-bottom:1px solid var(--gray3);}
+.mobile-search{display:none;padding:12px 16px;background:#fff;border-bottom:1px solid var(--gray3);width:100%;}
+.mobile-search .search-bar{height:40px;border-radius:var(--r);}
+.mobile-search .search-cat{display:none;}
+.mobile-search .search-input{font-size:13px;padding:0 12px;}
+.mobile-search .search-btn{padding:0 16px;font-size:16px;}
 
 /* ========== NAV BAR ========== */
 .nav-bar{
@@ -1103,6 +1107,179 @@ footer{background:var(--dark);color:#fff;padding:48px 0 0;margin-top:40px;}
   z-index:800;
   box-shadow:0 -4px 20px rgba(0,0,0,0.1);
 }
+
+/* HAMBURGER BUTTON */
+.hamburger-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--dark);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 8px 12px;
+  z-index: 901;
+  transition: all 0.3s ease;
+  line-height: 1;
+  order: -1;
+  margin-right: 8px;
+}
+
+.hamburger-btn:hover {
+  color: var(--green);
+  transform: scale(1.1);
+}
+
+.hamburger-btn.active {
+  color: var(--green);
+}
+
+/* MOBILE MENU SIDEBAR */
+.mobile-menu-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 280px;
+  height: 100vh;
+  background: #fff;
+  z-index: 899;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-menu-sidebar.active {
+  transform: translateX(0);
+}
+
+.mobile-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 898;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.mobile-menu-overlay.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.mobile-menu-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--gray3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mobile-menu-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.mobile-menu-content {
+  padding: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.mobile-menu-item {
+  display: block;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--gray4);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.mobile-menu-item:hover,
+.mobile-menu-item.active {
+  background: var(--greenl);
+  color: var(--green);
+  font-weight: 600;
+}
+
+.mobile-menu-item span {
+  display: inline-block;
+  margin-right: 12px;
+  font-size: 16px;
+}
+
+.mobile-menu-divider {
+  height: 1px;
+  background: var(--gray3);
+  margin: 12px 0;
+}
+
+.mobile-menu-bottom {
+  padding: 20px;
+  border-top: 1px solid var(--gray3);
+  flex-shrink: 0;
+  background: #fff;
+}
+
+.mobile-menu-bottom-btn {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--gray3);
+  background: #fff;
+  border-radius: var(--r-lg);
+  color: var(--dark);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  transition: all 0.2s;
+  margin-bottom: 8px;
+}
+
+.mobile-menu-bottom-btn:last-child {
+  margin-bottom: 0;
+}
+
+.mobile-menu-bottom-btn.primary {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+
+.mobile-menu-bottom-btn:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.mobile-menu-bottom-btn.primary:hover {
+  background: var(--green2);
+  border-color: var(--green2);
+}
+
+.mobile-menu-close {
+  background: none;
+  border: none;
+  color: var(--dark);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.mobile-menu-close:hover {
+  color: var(--green);
+}
 .mobile-nav-inner{
   display:flex;
   justify-content:space-around;
@@ -1807,15 +1984,19 @@ footer{background:var(--dark);color:#fff;padding:48px 0 0;margin-top:40px;}
 @media(max-width:640px){
   :root{--header-h:60px;--hdr-top:0px;}
   .topbar{display:none;}
-  .header-inner{gap:10px;padding:0 12px;height:60px;}
-  .logo-text{font-size:20px;}
-  .logo-icon{width:36px;height:36px;font-size:18px;border-radius:10px;}
-  .search-wrap{display:none;}
+  .header-inner{gap:8px;padding:0 8px;height:60px;width:100%;}
+  .logo-text{font-size:18px;}
+  .logo-icon{width:32px;height:32px;font-size:16px;border-radius:8px;}
+  .search-wrap{display:none !important;flex:0 !important;}
   .mobile-search{display:block;}
   .hdr-icon span:last-child{display:none;}
-  .hdr-icons{gap:2px;}
-  .hdr-icon{padding:6px 8px;}
-  .hdr-icon .ico{font-size:20px;}
+  .hdr-icons{gap:2px;flex-shrink:0;}
+  .hdr-icon{padding:6px 8px;font-size:11px;}
+  .hdr-icon .ico{font-size:18px;}
+  
+  /* Afficher le hamburger sur mobile */
+  .hamburger-btn{display:block;}
+  
   .nav-bar{display:none;}
   .hero-main{padding:24px 20px;min-height:210px;}
   .hero-deco{display:none;}
@@ -3016,6 +3197,9 @@ footer{background:var(--dark);color:#fff;padding:48px 0 0;margin-top:40px;}
 <!-- MAIN HEADER -->
 <header>
   <div class="header-inner">
+    <!-- Hamburger Button (mobile only) -->
+    <button class="hamburger-btn" id="hamburgerBtn" aria-label="Menu">☰</button>
+    
     <!-- Logo -->
     <a class="logo" href="#" onclick="showSection('home')">
       <div class="logo-icon">🛒</div>
@@ -3105,6 +3289,65 @@ footer{background:var(--dark);color:#fff;padding:48px 0 0;margin-top:40px;}
     </div>
   </div>
 </header>
+
+<!-- MOBILE MENU OVERLAY & SIDEBAR -->
+<div class="mobile-menu-overlay" id="mobileMenuOverlay"></div>
+<div class="mobile-menu-sidebar" id="mobileMenuSidebar">
+  <div class="mobile-menu-header">
+    <div class="mobile-menu-title">Menu</div>
+    <button class="mobile-menu-close" id="closeMenuBtn">✕</button>
+  </div>
+  <div class="mobile-menu-content">
+    <a class="mobile-menu-item" onclick="closeMobileMenu(); showSection('home',this)">
+      <span>🏠</span>Accueil
+    </a>
+    <a class="mobile-menu-item" onclick="closeMobileMenu(); showSection('shop',this)">
+      <span>🛍️</span>Boutique
+    </a>
+    <a class="mobile-menu-item" onclick="closeMobileMenu(); filterCat('Électronique',this)">
+      <span>📱</span>Électronique
+    </a>
+    <a class="mobile-menu-item" onclick="closeMobileMenu(); filterCat('Mode',this)">
+      <span>👗</span>Mode
+    </a>
+    <a class="mobile-menu-item" onclick="closeMobileMenu(); filterCat('Alimentation',this)">
+      <span>🍎</span>Alimentation
+    </a>
+    <a class="mobile-menu-item" onclick="closeMobileMenu(); filterCat('Maison & Déco',this)">
+      <span>🏠</span>Maison
+    </a>
+    <a class="mobile-menu-item" onclick="closeMobileMenu(); filterCat('Sport',this)">
+      <span>⚽</span>Sport
+    </a>
+    <a class="mobile-menu-item" onclick="closeMobileMenu(); filterCat('Beauté',this)">
+      <span>💄</span>Beauté
+    </a>
+    <a class="mobile-menu-item" onclick="closeMobileMenu(); filterCat('Auto & Moto',this)">
+      <span>🚗</span>Auto
+    </a>
+    <a class="mobile-menu-item" onclick="closeMobileMenu(); filterCat('Bébé & Jouets',this)">
+      <span>👶</span>Bébé
+    </a>
+    <a class="mobile-menu-item" onclick="closeMobileMenu(); showFlashSales()">
+      <span>🔥</span>Flash Sales
+    </a>
+    <div class="mobile-menu-divider"></div>
+    <a class="mobile-menu-item" href="pages.html">
+      <span>ℹ️</span>Pages
+    </a>
+    <a class="mobile-menu-item" href="contact.html">
+      <span>📧</span>Contact
+    </a>
+  </div>
+  <div class="mobile-menu-bottom">
+    <button class="mobile-menu-bottom-btn primary" onclick="closeMobileMenu(); openAuthModal()">
+      👤 Se connecter
+    </button>
+    <button class="mobile-menu-bottom-btn" onclick="closeMobileMenu(); openCart()">
+      🛒 Mon Panier
+    </button>
+  </div>
+</div>
 
 <!-- NAV BAR -->
 <div class="nav-bar">
@@ -4266,7 +4509,104 @@ window.addEventListener('load', async function() {
 
   // Vérification statut paiement après retour depuis SenePay
   await checkPaymentReturn();
+
+  // ===== INITIALIZE MOBILE MENU =====
+  initMobileMenu();
 });
+
+// ===== NEWSLETTER FUNCTIONS =====
+async function subscribeNewsletter() {
+  const emailInput = document.getElementById('newsletterEmail');
+  if (!emailInput) return;
+
+  const email = emailInput.value.trim();
+
+  if (!email || !email.includes('@')) {
+    showToast('❌ Veuillez entrer une adresse email valide', 'error');
+    return;
+  }
+
+  const btn = event.target;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ En cours...';
+
+  try {
+    const response = await fetch('http://localhost:3000/api/newsletter/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email,
+        firstName: '',
+        lastName: ''
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      emailInput.value = '';
+      showToast('✅ Merci pour votre abonnement! 🎁', 'success');
+    } else {
+      showToast('❌ ' + (data.error || 'Erreur lors de l\'abonnement'), 'error');
+    }
+  } catch (error) {
+    console.error('Newsletter subscribe error:', error);
+    showToast('❌ Erreur réseau. Réessayez plus tard.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+// ===== MOBILE MENU FUNCTIONS =====
+function initMobileMenu() {
+  const hamburgerBtn = document.getElementById('hamburgerBtn');
+  const closeMenuBtn = document.getElementById('closeMenuBtn');
+  const sidebar = document.getElementById('mobileMenuSidebar');
+  const overlay = document.getElementById('mobileMenuOverlay');
+
+  if (hamburgerBtn) {
+    hamburgerBtn.addEventListener('click', openMobileMenu);
+  }
+
+  if (closeMenuBtn) {
+    closeMenuBtn.addEventListener('click', closeMobileMenu);
+  }
+
+  if (overlay) {
+    overlay.addEventListener('click', closeMobileMenu);
+  }
+
+  // Close menu if window resizes to larger size
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 640) {
+      closeMobileMenu();
+    }
+  });
+}
+
+function openMobileMenu() {
+  const sidebar = document.getElementById('mobileMenuSidebar');
+  const overlay = document.getElementById('mobileMenuOverlay');
+  const hamburgerBtn = document.getElementById('hamburgerBtn');
+
+  if (sidebar) sidebar.classList.add('active');
+  if (overlay) overlay.classList.add('active');
+  if (hamburgerBtn) hamburgerBtn.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMobileMenu() {
+  const sidebar = document.getElementById('mobileMenuSidebar');
+  const overlay = document.getElementById('mobileMenuOverlay');
+  const hamburgerBtn = document.getElementById('hamburgerBtn');
+
+  if (sidebar) sidebar.classList.remove('active');
+  if (overlay) overlay.classList.remove('active');
+  if (hamburgerBtn) hamburgerBtn.classList.remove('active');
+  document.body.style.overflow = '';
+}
 
 async function checkPaymentReturn() {
   const params = new URLSearchParams(window.location.search);
@@ -5366,6 +5706,7 @@ async function _saveOrderToServer(ref, addr, total, subtotal, commission) {
         paymentMethod: selectedPayment === 'livraison' ? 'delivery' : 'senepay',
         customerName: currentUser.name,
         customerPhone: (currentUser.phone || '').replace(/[^0-9]/g, ''),
+        customerEmail: currentUser.email || '',
         orderRef: ref
       })
     });
