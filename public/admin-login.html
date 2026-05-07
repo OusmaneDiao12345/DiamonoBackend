@@ -333,9 +333,9 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js"></script>
-    <script src="https://accounts.google.com/gsi/client"></script>
+    <!-- Firebase SDK (Compat version for HTML) -->
+    <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
 
     <script>
         // ==================== FIREBASE CONFIG ====================
@@ -350,7 +350,7 @@
 
         let auth = null;
 
-        // Initialize Firebase
+        // Initialize Firebase (Compat)
         try {
             firebase.initializeApp(firebaseConfig);
             auth = firebase.auth();
