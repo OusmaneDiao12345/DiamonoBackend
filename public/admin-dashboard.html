@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DiamanoSN - Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <style>
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --danger: #f56565;
+            --success: #48bb78;
+            --warning: #ed8936;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8f9fa;
+            color: #333;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            min-height: 100vh;
+            color: white;
+            padding: 20px;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 250px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .sidebar .logo {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 2px solid rgba(255,255,255,0.3);
+            padding-bottom: 15px;
+        }
+
+        .sidebar-menu {
+            list-style: none;
+        }
+
+        .sidebar-menu li {
+            margin: 10px 0;
+        }
+
+        .sidebar-menu a {
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            border-radius: 8px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .sidebar-menu a:hover,
+        .sidebar-menu a.active {
+            background: rgba(255,255,255,0.2);
+            padding-left: 25px;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 250px;
+            padding: 30px;
+            min-height: 100vh;
+        }
+
+        .top-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        /* Dashboard Cards */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--primary);
+        }
+
+        .stat-card.orders {
+            border-left-color: var(--success);
+        }
+
+        .stat-card.products {
+            border-left-color: var(--primary);
+        }
+
+        .stat-card.revenue {
+            border-left-color: var(--warning);
+        }
+
+        .stat-card.users {
+            border-left-color: var(--secondary);
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            color: #999;
+            font-size: 14px;
+        }
+
+        .stat-icon {
+            font-size: 32px;
+            opacity: 0.2;
+            float: right;
+        }
+
+        /* Section Panels */
+        .section-panel {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            padding: 25px;
+            display: none;
+        }
+
+        .section-panel.active {
+            display: block;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .section-header h2 {
+            font-size: 24px;
+            color: #333;
+            margin: 0;
+        }
+
+        /* Buttons */
+        .btn-primary, .btn-success, .btn-warning, .btn-danger {
+            border-radius: 6px;
+            font-weight: 500;
+            padding: 10px 20px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            border: none;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary);
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .form-control {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 10px 15px;
+            font-size: 14px;
+            transition: border 0.3s;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Tables */
+        .table {
+            margin: 0;
+            border: none;
+        }
+
+        .table thead th {
+            background: #f8f9fa;
+            border: none;
+            font-weight: 600;
+            color: #333;
+            padding: 15px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .table tbody td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
+
+        .table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 500;
+            font-size: 12px;
+        }
+
+        .badge-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-cancelled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Modal */
+        .modal-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border: none;
+        }
+
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+
+        /* Action buttons */
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+            border-radius: 4px;
+            margin: 0 2px;
+        }
+
+        .btn-edit {
+            background: var(--primary);
+            color: white;
+            border: none;
+        }
+
+        .btn-edit:hover {
+            background: var(--secondary);
+        }
+
+        .btn-delete {
+            background: var(--danger);
+            color: white;
+            border: none;
+        }
+
+        .btn-delete:hover {
+            background: #c53030;
+        }
+
+        /* Alert */
+        .alert {
+            border-radius: 6px;
+            border: none;
+            margin-bottom: 20px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 200px;
+            }
+
+            .main-content {
+                margin-left: 200px;
+                padding: 15px;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .top-bar {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner-border {
+            color: var(--primary);
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-box input {
+            padding-left: 40px;
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="logo">
+            <i class="bi bi-gem"></i> DiamanoSN
+        </div>
+        <ul class="sidebar-menu">
+            <li><a href="#" onclick="switchSection('dashboard')" class="menu-item active" data-section="dashboard">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </a></li>
+            <li><a href="#" onclick="switchSection('products')" class="menu-item" data-section="products">
+                <i class="bi bi-box-seam"></i> Produits
+            </a></li>
+            <li><a href="#" onclick="switchSection('orders')" class="menu-item" data-section="orders">
+                <i class="bi bi-bag-check"></i> Commandes
+            </a></li>
+            <li><a href="#" onclick="switchSection('users')" class="menu-item" data-section="users">
+                <i class="bi bi-people"></i> Utilisateurs
+            </a></li>
+            <li><a href="#" onclick="switchSection('settings')" class="menu-item" data-section="settings">
+                <i class="bi bi-gear"></i> Paramètres
+            </a></li>
+            <li style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.3); padding-top: 20px;">
+                <a href="#" onclick="logout()" class="menu-item">
+                    <i class="bi bi-box-arrow-right"></i> Déconnexion
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div>
+                <h3>Bienvenue sur DiamanoSN Admin</h3>
+                <small class="text-muted">Gérez votre boutique en ligne</small>
+            </div>
+            <div class="user-info">
+                <div>
+                    <div style="font-weight: 600;" id="userEmail">Admin</div>
+                    <small class="text-muted">Administrateur</small>
+                </div>
+                <div class="user-avatar" id="userAvatar">A</div>
+            </div>
+        </div>
+
+        <!-- DASHBOARD SECTION -->
+        <div id="dashboard" class="section-panel active">
+            <div class="section-header">
+                <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="stat-card products">
+                    <div class="stat-icon"><i class="bi bi-box-seam"></i></div>
+                    <div class="stat-label">Produits Actifs</div>
+                    <div class="stat-value" id="totalProducts">0</div>
+                </div>
+                <div class="stat-card orders">
+                    <div class="stat-icon"><i class="bi bi-bag-check"></i></div>
+                    <div class="stat-label">Commandes Totales</div>
+                    <div class="stat-value" id="totalOrders">0</div>
+                </div>
+                <div class="stat-card revenue">
+                    <div class="stat-icon"><i class="bi bi-coin"></i></div>
+                    <div class="stat-label">Chiffre d'affaires</div>
+                    <div class="stat-value" id="totalRevenue">0 FCFA</div>
+                </div>
+                <div class="stat-card users">
+                    <div class="stat-icon"><i class="bi bi-people"></i></div>
+                    <div class="stat-label">Clients Enregistrés</div>
+                    <div class="stat-value" id="totalUsers">0</div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <h5 class="mb-4">Dernières Commandes</h5>
+                        <div id="recentOrders" class="loading">
+                            <div class="spinner-border" role="status"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <h5 class="mb-4">Statuts des Commandes</h5>
+                        <div id="orderStats">
+                            <p class="text-muted">Chargement...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PRODUCTS SECTION -->
+        <div id="products" class="section-panel">
+            <div class="section-header">
+                <h2><i class="bi bi-box-seam"></i> Gestion des Produits</h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#productModal">
+                    <i class="bi bi-plus-circle"></i> Ajouter un Produit
+                </button>
+            </div>
+
+            <div class="search-box mb-4">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control" id="productSearch" placeholder="Rechercher un produit...">
+            </div>
+
+            <div id="productsLoading" class="loading">
+                <div class="spinner-border" role="status"></div>
+            </div>
+
+            <table class="table table-hover" id="productsTable">
+                <thead>
+                    <tr>
+                        <th>Image</th>
+                        <th>Nom</th>
+                        <th>Catégorie</th>
+                        <th>Prix</th>
+                        <th>Stock</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="productsList">
+                </tbody>
+            </table>
+            <div id="noProducts" class="no-data">Aucun produit trouvé</div>
+        </div>
+
+        <!-- ORDERS SECTION -->
+        <div id="orders" class="section-panel">
+            <div class="section-header">
+                <h2><i class="bi bi-bag-check"></i> Gestion des Commandes</h2>
+            </div>
+
+            <div class="search-box mb-4">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control" id="orderSearch" placeholder="Rechercher une commande...">
+            </div>
+
+            <div id="ordersLoading" class="loading">
+                <div class="spinner-border" role="status"></div>
+            </div>
+
+            <table class="table table-hover" id="ordersTable">
+                <thead>
+                    <tr>
+                        <th>ID Commande</th>
+                        <th>Client</th>
+                        <th>Montant</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="ordersList">
+                </tbody>
+            </table>
+            <div id="noOrders" class="no-data">Aucune commande trouvée</div>
+        </div>
+
+        <!-- USERS SECTION -->
+        <div id="users" class="section-panel">
+            <div class="section-header">
+                <h2><i class="bi bi-people"></i> Gestion des Utilisateurs</h2>
+            </div>
+
+            <div class="search-box mb-4">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control" id="userSearch" placeholder="Rechercher un utilisateur...">
+            </div>
+
+            <div id="usersLoading" class="loading">
+                <div class="spinner-border" role="status"></div>
+            </div>
+
+            <table class="table table-hover" id="usersTable">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Nom</th>
+                        <th>Date d'inscription</th>
+                        <th>Commandes</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersList">
+                </tbody>
+            </table>
+            <div id="noUsers" class="no-data">Aucun utilisateur trouvé</div>
+        </div>
+
+        <!-- SETTINGS SECTION -->
+        <div id="settings" class="section-panel">
+            <div class="section-header">
+                <h2><i class="bi bi-gear"></i> Paramètres</h2>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-6">
+                    <h5 class="mb-4">Paramètres du Magasin</h5>
+                    <div class="form-group">
+                        <label class="form-label">Nom du Magasin</label>
+                        <input type="text" class="form-control" id="storeName" value="DiamanoSN">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email de Contact</label>
+                        <input type="email" class="form-control" id="storeEmail" value="contact@diamanosn.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Téléphone</label>
+                        <input type="tel" class="form-control" id="storePhone" placeholder="+221 77 XXX XXXX">
+                    </div>
+                    <button class="btn btn-primary" onclick="saveSettings()">
+                        <i class="bi bi-check-circle"></i> Enregistrer
+                    </button>
+                </div>
+                <div class="col-lg-6">
+                    <h5 class="mb-4">Information Système</h5>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                        <p><strong>Version:</strong> 1.0.0</p>
+                        <p><strong>Base de données:</strong> Firebase</p>
+                        <p><strong>Utilisateur:</strong> <span id="adminUser">Admin</span></p>
+                        <p><strong>Dernier accès:</strong> <span id="lastLogin">--</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Modal -->
+    <div class="modal fade" id="productModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="productModalTitle">Ajouter un Produit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="productForm">
+                        <div class="form-group">
+                            <label class="form-label">Nom du Produit *</label>
+                            <input type="text" class="form-control" id="productName" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Catégorie *</label>
+                                    <select class="form-control" id="productCategory" required>
+                                        <option value="">Sélectionner une catégorie</option>
+                                        <option value="bijoux">Bijoux</option>
+                                        <option value="montres">Montres</option>
+                                        <option value="accessories">Accessoires</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Prix (FCFA) *</label>
+                                    <input type="number" class="form-control" id="productPrice" min="0" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Stock *</label>
+                                    <input type="number" class="form-control" id="productStock" min="0" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Image URL</label>
+                                    <input type="url" class="form-control" id="productImage" placeholder="https://...">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" id="productDescription" rows="3" placeholder="Description détaillée..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="productActive" checked>
+                                <label class="form-check-label" for="productActive">Produit Actif</label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" onclick="saveProduct()">
+                        <i class="bi bi-check-circle"></i> Enregistrer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Container -->
+    <div id="alertContainer" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        // ==================== FIREBASE CONFIG ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAKh7xMUjvN0V2X3Q4R5S6T7U8V9W0X1Y2Z",
+            authDomain: "diamanosn-ea0a1.firebaseapp.com",
+            projectId: "diamanosn-ea0a1",
+            storageBucket: "diamanosn-ea0a1.appspot.com",
+            messagingSenderId: "104015846341111283274",
+            appId: "1:104015846341111283274:web:abc123def456ghi789jkl"
+        };
+
+        let db, auth, currentUser, currentProductId = null;
+
+        // ==================== INITIALIZATION ====================
+        firebase.initializeApp(firebaseConfig);
+        auth = firebase.auth();
+        db = firebase.firestore();
+
+        // Check Authentication
+        auth.onAuthStateChanged(user => {
+            if (!user) {
+                // User not logged in - redirect to login
+                window.location.href = './admin-login.html';
+            } else {
+                currentUser = user;
+                document.getElementById('userEmail').textContent = user.email;
+                document.getElementById('adminUser').textContent = user.email;
+                document.getElementById('userAvatar').textContent = user.email.charAt(0).toUpperCase();
+                loadDashboard();
+            }
+        });
+
+        // ==================== NAVIGATION ====================
+        function switchSection(section) {
+            // Hide all sections
+            document.querySelectorAll('.section-panel').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+
+            // Show selected section
+            document.getElementById(section).classList.add('active');
+            document.querySelector(`[data-section="${section}"]`).classList.add('active');
+
+            // Load data if needed
+            if (section === 'products') loadProducts();
+            else if (section === 'orders') loadOrders();
+            else if (section === 'users') loadUsers();
+        }
+
+        // ==================== DASHBOARD ====================
+        async function loadDashboard() {
+            try {
+                // Total Products
+                const productsSnap = await db.collection('products').get();
+                document.getElementById('totalProducts').textContent = productsSnap.size;
+
+                // Total Orders
+                const ordersSnap = await db.collection('orders').get();
+                document.getElementById('totalOrders').textContent = ordersSnap.size;
+
+                // Total Revenue
+                let totalRevenue = 0;
+                ordersSnap.forEach(doc => {
+                    totalRevenue += doc.data().total || 0;
+                });
+                document.getElementById('totalRevenue').textContent = new Intl.NumberFormat('fr-SN').format(totalRevenue) + ' FCFA';
+
+                // Total Users
+                const usersSnap = await db.collection('users').get();
+                document.getElementById('totalUsers').textContent = usersSnap.size;
+
+                // Recent Orders
+                loadRecentOrders();
+                loadOrderStats();
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        async function loadRecentOrders() {
+            try {
+                const ordersSnap = await db.collection('orders').orderBy('createdAt', 'desc').limit(5).get();
+                let html = '';
+
+                if (ordersSnap.empty) {
+                    html = '<p class="text-muted">Aucune commande</p>';
+                } else {
+                    html = '<table class="table table-sm"><thead><tr><th>ID</th><th>Client</th><th>Montant</th><th>Status</th></tr></thead><tbody>';
+                    ordersSnap.forEach(doc => {
+                        const order = doc.data();
+                        html += `<tr>
+                            <td><small>${doc.id.substring(0, 8)}...</small></td>
+                            <td><small>${order.customerEmail || 'N/A'}</small></td>
+                            <td><strong>${order.total} FCFA</strong></td>
+                            <td><span class="badge badge-${order.status === 'completed' ? 'completed' : order.status === 'pending' ? 'pending' : 'cancelled'}">${order.status}</span></td>
+                        </tr>`;
+                    });
+                    html += '</tbody></table>';
+                }
+
+                document.getElementById('recentOrders').innerHTML = html;
+                document.getElementById('recentOrders').classList.remove('loading');
+            } catch (error) {
+                console.error('Error loading recent orders:', error);
+            }
+        }
+
+        async function loadOrderStats() {
+            try {
+                const ordersSnap = await db.collection('orders').get();
+                let pending = 0, completed = 0, cancelled = 0;
+
+                ordersSnap.forEach(doc => {
+                    const status = doc.data().status;
+                    if (status === 'pending') pending++;
+                    else if (status === 'completed') completed++;
+                    else if (status === 'cancelled') cancelled++;
+                });
+
+                document.getElementById('orderStats').innerHTML = `
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>En attente</span>
+                            <strong>${pending}</strong>
+                        </div>
+                        <div style="background: #e9ecef; border-radius: 10px; height: 8px; overflow: hidden;">
+                            <div style="background: var(--warning); height: 100%; width: ${pending > 0 ? (pending / (pending + completed + cancelled)) * 100 : 0}%"></div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>Complétées</span>
+                            <strong>${completed}</strong>
+                        </div>
+                        <div style="background: #e9ecef; border-radius: 10px; height: 8px; overflow: hidden;">
+                            <div style="background: var(--success); height: 100%; width: ${completed > 0 ? (completed / (pending + completed + cancelled)) * 100 : 0}%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>Annulées</span>
+                            <strong>${cancelled}</strong>
+                        </div>
+                        <div style="background: #e9ecef; border-radius: 10px; height: 8px; overflow: hidden;">
+                            <div style="background: var(--danger); height: 100%; width: ${cancelled > 0 ? (cancelled / (pending + completed + cancelled)) * 100 : 0}%"></div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading order stats:', error);
+            }
+        }
+
+        // ==================== PRODUCTS ====================
+        async function loadProducts() {
+            document.getElementById('productsLoading').style.display = 'block';
+            document.getElementById('productsList').innerHTML = '';
+
+            try {
+                const productsSnap = await db.collection('products').get();
+
+                if (productsSnap.empty) {
+                    document.getElementById('noProducts').style.display = 'block';
+                } else {
+                    document.getElementById('noProducts').style.display = 'none';
+                    productsSnap.forEach(doc => {
+                        const product = doc.data();
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>
+                                ${product.image ? `<img src="${product.image}" alt="${product.name}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">` : '<span class="text-muted">-</span>'}
+                            </td>
+                            <td><strong>${product.name}</strong></td>
+                            <td>${product.category}</td>
+                            <td><strong>${product.price} FCFA</strong></td>
+                            <td><span class="badge ${product.stock > 10 ? 'bg-success' : product.stock > 0 ? 'bg-warning' : 'bg-danger'}">${product.stock}</span></td>
+                            <td><span class="badge ${product.active ? 'bg-success' : 'bg-secondary'}">${product.active ? 'Actif' : 'Inactif'}</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-edit" onclick="editProduct('${doc.id}')"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-delete" onclick="deleteProduct('${doc.id}')"><i class="bi bi-trash"></i></button>
+                            </td>
+                        `;
+                        document.getElementById('productsList').appendChild(row);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading products:', error);
+                showAlert('Erreur lors du chargement des produits', 'danger');
+            }
+
+            document.getElementById('productsLoading').style.display = 'none';
+        }
+
+        async function saveProduct() {
+            const name = document.getElementById('productName').value;
+            const category = document.getElementById('productCategory').value;
+            const price = parseFloat(document.getElementById('productPrice').value);
+            const stock = parseInt(document.getElementById('productStock').value);
+            const image = document.getElementById('productImage').value;
+            const description = document.getElementById('productDescription').value;
+            const active = document.getElementById('productActive').checked;
+
+            if (!name || !category || !price || stock < 0) {
+                showAlert('Tous les champs obligatoires doivent être remplis', 'warning');
+                return;
+            }
+
+            try {
+                if (currentProductId) {
+                    // Update existing
+                    await db.collection('products').doc(currentProductId).update({
+                        name, category, price, stock, image, description, active
+                    });
+                    showAlert('Produit mis à jour avec succès', 'success');
+                    currentProductId = null;
+                } else {
+                    // Add new
+                    await db.collection('products').add({
+                        name, category, price, stock, image, description, active,
+                        createdAt: new Date()
+                    });
+                    showAlert('Produit ajouté avec succès', 'success');
+                }
+
+                document.getElementById('productForm').reset();
+                document.getElementById('productModal').querySelector('.btn-close').click();
+                loadProducts();
+            } catch (error) {
+                console.error('Error saving product:', error);
+                showAlert('Erreur lors de l\'enregistrement', 'danger');
+            }
+        }
+
+        async function editProduct(id) {
+            try {
+                const doc = await db.collection('products').doc(id).get();
+                const product = doc.data();
+
+                currentProductId = id;
+                document.getElementById('productName').value = product.name;
+                document.getElementById('productCategory').value = product.category;
+                document.getElementById('productPrice').value = product.price;
+                document.getElementById('productStock').value = product.stock;
+                document.getElementById('productImage').value = product.image || '';
+                document.getElementById('productDescription').value = product.description || '';
+                document.getElementById('productActive').checked = product.active !== false;
+                document.getElementById('productModalTitle').textContent = 'Modifier le Produit';
+
+                const modal = new bootstrap.Modal(document.getElementById('productModal'));
+                modal.show();
+            } catch (error) {
+                console.error('Error loading product:', error);
+            }
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return;
+
+            try {
+                await db.collection('products').doc(id).delete();
+                showAlert('Produit supprimé avec succès', 'success');
+                loadProducts();
+            } catch (error) {
+                console.error('Error deleting product:', error);
+                showAlert('Erreur lors de la suppression', 'danger');
+            }
+        }
+
+        // ==================== ORDERS ====================
+        async function loadOrders() {
+            document.getElementById('ordersLoading').style.display = 'block';
+            document.getElementById('ordersList').innerHTML = '';
+
+            try {
+                const ordersSnap = await db.collection('orders').orderBy('createdAt', 'desc').get();
+
+                if (ordersSnap.empty) {
+                    document.getElementById('noOrders').style.display = 'block';
+                } else {
+                    document.getElementById('noOrders').style.display = 'none';
+                    ordersSnap.forEach(doc => {
+                        const order = doc.data();
+                        const row = document.createElement('tr');
+                        const date = order.createdAt ? new Date(order.createdAt.toDate()).toLocaleDateString('fr-SN') : 'N/A';
+                        
+                        row.innerHTML = `
+                            <td><small>${doc.id.substring(0, 10)}...</small></td>
+                            <td>${order.customerEmail || 'N/A'}</td>
+                            <td><strong>${order.total} FCFA</strong></td>
+                            <td>${date}</td>
+                            <td><span class="badge badge-${order.status === 'completed' ? 'completed' : order.status === 'pending' ? 'pending' : 'cancelled'}">${order.status}</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" onclick="viewOrder('${doc.id}')"><i class="bi bi-eye"></i></button>
+                                <select class="form-select form-select-sm" style="display: inline-block; width: auto;" onchange="updateOrderStatus('${doc.id}', this.value)">
+                                    <option value="${order.status}">${order.status}</option>
+                                    <option value="pending">En attente</option>
+                                    <option value="completed">Complétée</option>
+                                    <option value="cancelled">Annulée</option>
+                                </select>
+                            </td>
+                        `;
+                        document.getElementById('ordersList').appendChild(row);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading orders:', error);
+            }
+
+            document.getElementById('ordersLoading').style.display = 'none';
+        }
+
+        async function updateOrderStatus(orderId, status) {
+            try {
+                await db.collection('orders').doc(orderId).update({ status });
+                showAlert('Statut mis à jour', 'success');
+                loadOrders();
+            } catch (error) {
+                console.error('Error updating order:', error);
+                showAlert('Erreur lors de la mise à jour', 'danger');
+            }
+        }
+
+        function viewOrder(orderId) {
+            alert('Détails de la commande: ' + orderId);
+        }
+
+        // ==================== USERS ====================
+        async function loadUsers() {
+            document.getElementById('usersLoading').style.display = 'block';
+            document.getElementById('usersList').innerHTML = '';
+
+            try {
+                const usersSnap = await db.collection('users').get();
+
+                if (usersSnap.empty) {
+                    document.getElementById('noUsers').style.display = 'block';
+                } else {
+                    document.getElementById('noUsers').style.display = 'none';
+                    usersSnap.forEach(doc => {
+                        const user = doc.data();
+                        const row = document.createElement('tr');
+                        const joinDate = user.createdAt ? new Date(user.createdAt.toDate()).toLocaleDateString('fr-SN') : 'N/A';
+
+                        row.innerHTML = `
+                            <td>${user.email}</td>
+                            <td>${user.name || 'N/A'}</td>
+                            <td>${joinDate}</td>
+                            <td><span class="badge bg-primary">${user.orderCount || 0}</span></td>
+                            <td><span class="badge bg-success">Actif</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" onclick="viewUser('${doc.id}')"><i class="bi bi-eye"></i></button>
+                            </td>
+                        `;
+                        document.getElementById('usersList').appendChild(row);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+
+            document.getElementById('usersLoading').style.display = 'none';
+        }
+
+        function viewUser(userId) {
+            alert('Détails de l\'utilisateur: ' + userId);
+        }
+
+        // ==================== SETTINGS ====================
+        function saveSettings() {
+            showAlert('Paramètres enregistrés avec succès', 'success');
+        }
+
+        // ==================== UTILITIES ====================
+        function showAlert(message, type = 'info') {
+            const alertId = 'alert-' + Date.now();
+            const alertHTML = `
+                <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" style="min-width: 300px;">
+                    <strong>${type === 'danger' ? 'Erreur' : type === 'success' ? 'Succès' : 'Info'}!</strong> ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+
+            document.getElementById('alertContainer').insertAdjacentHTML('beforeend', alertHTML);
+            setTimeout(() => {
+                const alert = document.getElementById(alertId);
+                if (alert) alert.remove();
+            }, 4000);
+        }
+
+        async function logout() {
+            if (confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
+                await auth.signOut();
+                window.location.href = './admin-login.html';
+            }
+        }
+
+        // Search functionality
+        document.getElementById('productSearch').addEventListener('keyup', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('#productsList tr').forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+
+        document.getElementById('orderSearch').addEventListener('keyup', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('#ordersList tr').forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+
+        document.getElementById('userSearch').addEventListener('keyup', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('#usersList tr').forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+
+        // Reset modal when closed
+        document.getElementById('productModal').addEventListener('hidden.bs.modal', () => {
+            currentProductId = null;
+            document.getElementById('productForm').reset();
+            document.getElementById('productModalTitle').textContent = 'Ajouter un Produit';
+        });
+    </script>
+</body>
+</html>
