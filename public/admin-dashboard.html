@@ -724,26 +724,37 @@
             appId: "1:104015846341111283274:web:abc123def456ghi789jkl"
         };
 
-        let db, auth, currentUser, currentProductId = null;
+        let db = null, auth = null, currentUser = null, currentProductId = null;
 
         // ==================== INITIALIZATION ====================
-        firebase.initializeApp(firebaseConfig);
-        auth = firebase.auth();
-        db = firebase.firestore();
+        try {
+            firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            db = firebase.firestore();
+            console.log('✅ Firebase initialized successfully');
+        } catch (error) {
+            console.error('❌ Firebase initialization error:', error);
+            alert('Erreur d\'initialisation Firebase. Veuillez rafraîchir la page.');
+        }
 
         // Check Authentication
-        auth.onAuthStateChanged(user => {
-            if (!user) {
-                // User not logged in - redirect to login
-                window.location.href = './admin-login.html';
-            } else {
-                currentUser = user;
-                document.getElementById('userEmail').textContent = user.email;
-                document.getElementById('adminUser').textContent = user.email;
-                document.getElementById('userAvatar').textContent = user.email.charAt(0).toUpperCase();
-                loadDashboard();
-            }
-        });
+        if (auth) {
+            auth.onAuthStateChanged(user => {
+                if (!user) {
+                    // User not logged in - redirect to login
+                    window.location.href = './admin-login.html';
+                } else {
+                    currentUser = user;
+                    document.getElementById('userEmail').textContent = user.email;
+                    document.getElementById('adminUser').textContent = user.email;
+                    document.getElementById('userAvatar').textContent = user.email.charAt(0).toUpperCase();
+                    loadDashboard();
+                }
+            });
+        } else {
+            console.error('❌ Auth not initialized');
+            alert('Firebase n\'est pas initialisé correctement.');
+        }
 
         // ==================== NAVIGATION ====================
         function switchSection(section) {
