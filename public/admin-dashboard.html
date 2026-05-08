@@ -716,46 +716,53 @@
 
     <script>
         // ==================== FIREBASE CONFIG ====================
-        const firebaseConfig = {
-            apiKey: "AIzaSyAKh7xMUjvN0V2X3Q4R5S6T7U8V9W0X1Y2Z",
-            authDomain: "diamanosn-ea0a1.firebaseapp.com",
-            projectId: "diamanosn-ea0a1",
-            storageBucket: "diamanosn-ea0a1.appspot.com",
-            messagingSenderId: "104015846341111283274",
-            appId: "1:104015846341111283274:web:abc123def456ghi789jkl"
-        };
-
+        let firebaseConfig = null;
         let db = null, auth = null, currentUser = null, currentProductId = null;
 
-        // ==================== INITIALIZATION ====================
-        try {
-            firebase.initializeApp(firebaseConfig);
-            auth = firebase.auth();
-            db = firebase.firestore();
-            console.log('✅ Firebase initialized successfully');
-        } catch (error) {
-            console.error('❌ Firebase initialization error:', error);
-            alert('Erreur d\'initialisation Firebase. Veuillez rafraîchir la page.');
+        // Fetch Firebase config from server
+        async function initializeFirebase() {
+            try {
+                const response = await fetch('/api/config/firebase');
+                firebaseConfig = await response.json();
+                console.log('✅ Firebase config loaded:', firebaseConfig.projectId);
+                
+                // Initialize Firebase after config is loaded
+                try {
+                    firebase.initializeApp(firebaseConfig);
+                    auth = firebase.auth();
+                    db = firebase.firestore();
+                    console.log('✅ Firebase initialized successfully');
+                    
+                    // Check Authentication
+                    if (auth) {
+                        auth.onAuthStateChanged(user => {
+                            if (!user) {
+                                // User not logged in - redirect to login
+                                window.location.href = './admin-login.html';
+                            } else {
+                                currentUser = user;
+                                document.getElementById('userEmail').textContent = user.email;
+                                document.getElementById('adminUser').textContent = user.email;
+                                document.getElementById('userAvatar').textContent = user.email.charAt(0).toUpperCase();
+                                loadDashboard();
+                            }
+                        });
+                    } else {
+                        console.error('❌ Auth not initialized');
+                        alert('Firebase n\'est pas initialisé correctement.');
+                    }
+                } catch (error) {
+                    console.error('❌ Firebase initialization error:', error);
+                    alert('Erreur d\'initialisation Firebase. Veuillez rafraîchir la page.');
+                }
+            } catch (error) {
+                console.error('❌ Error loading Firebase config:', error);
+                alert('Erreur lors du chargement de la configuration Firebase.');
+            }
         }
 
-        // Check Authentication
-        if (auth) {
-            auth.onAuthStateChanged(user => {
-                if (!user) {
-                    // User not logged in - redirect to login
-                    window.location.href = './admin-login.html';
-                } else {
-                    currentUser = user;
-                    document.getElementById('userEmail').textContent = user.email;
-                    document.getElementById('adminUser').textContent = user.email;
-                    document.getElementById('userAvatar').textContent = user.email.charAt(0).toUpperCase();
-                    loadDashboard();
-                }
-            });
-        } else {
-            console.error('❌ Auth not initialized');
-            alert('Firebase n\'est pas initialisé correctement.');
-        }
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initializeFirebase);
 
         // ==================== NAVIGATION ====================
         function switchSection(section) {
