@@ -255,8 +255,8 @@
             try {
                 const token = sessionStorage.getItem('firebaseToken');
                 
-                // Appel au backend API
-                const response = await fetch(`/api/admin/orders/${currentOrderId}`, {
+                // Appel au backend API (URL absolue vers Render)
+                const response = await fetch(`https://diamonobackend.onrender.com/api/admin/orders/${currentOrderId}`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
