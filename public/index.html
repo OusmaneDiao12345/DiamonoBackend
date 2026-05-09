@@ -4438,7 +4438,18 @@ const TESTIMONIALS = [
 ];
 
 // ==================== STATE ====================
-let cart = JSON.parse(localStorage.getItem('cart')) || [];
+let currentUser = JSON.parse(localStorage.getItem('diamanoUser'));
+
+// 🔐 SÉCURITÉ: Générer clé de stockage unique par utilisateur
+function getCartKey() {
+  if (!currentUser || !currentUser.id) {
+    return 'cart_guest'; // Panier anonymous si pas connecté
+  }
+  return `cart_${currentUser.id}`; // Panier isolé par utilisateur
+}
+
+// Charger panier par utilisateur
+let cart = JSON.parse(localStorage.getItem(getCartKey())) || [];
 let wishlist = JSON.parse(localStorage.getItem('wishlist')) || [];
 let recentlyViewed = JSON.parse(localStorage.getItem('recentlyViewed')) || [];
 let currentCat = null;
@@ -4446,7 +4457,6 @@ let currentProducts = [];
 let currentPage = 1;
 let itemsPerPage = 20;
 let currentView = 'grid';
-let currentUser = JSON.parse(localStorage.getItem('diamanoUser'));
 
 // Auto-détection: si servi depuis Live Server (:5500), le node tourne sur :3000
 const API_URL = (() => {
@@ -5250,6 +5260,8 @@ async function doRegister() {
 function loginSuccess(user) {
   currentUser = user;
   localStorage.setItem('diamanoUser', JSON.stringify(user));
+  // 🔐 SÉCURITÉ: Charger le panier de cet utilisateur
+  cart = JSON.parse(localStorage.getItem(getCartKey())) || [];
   closeAuthModal();
   updateAccountUI();
   renderCartPanel();
@@ -5437,8 +5449,12 @@ function closeLogoutModal() {
 }
 function confirmLogout() {
   closeLogoutModal();
+  // 🔐 SÉCURITÉ: Vider le panier ET nettoyer localStorage
+  const oldCartKey = getCartKey();
   currentUser = null;
   localStorage.removeItem('diamanoUser');
+  localStorage.removeItem(oldCartKey); // Supprimer l'ancien panier
+  cart = []; // Vider le panier en mémoire
   updateAccountUI();
   renderProfile();
   renderCartPanel();
@@ -5479,7 +5495,7 @@ function changeQty(id, delta){
 }
 
 function saveCart() {
-  localStorage.setItem('cart', JSON.stringify(cart));
+  localStorage.setItem(getCartKey(), JSON.stringify(cart));
 }
 
 function updateCartUI(){
