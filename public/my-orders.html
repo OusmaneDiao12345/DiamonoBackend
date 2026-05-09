@@ -215,22 +215,23 @@
     <div id="ordersList" class="orders-container"></div>
   </div>
 
-  <script src="https://www.gstatic.com/firebaseapp/10.7.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebaseapp/10.7.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebaseapp/10.7.1/firebase-firestore.js"></script>
-  <script>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+    import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
+    import { getFirestore, collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+
     const firebaseConfig = {
-      apiKey: "AIzaSyABH-6hzANRCGSn7Q-DxZl3kZc34AzB2kQ",
+      apiKey: "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
       authDomain: "diamanosn-ea0a1.firebaseapp.com",
       projectId: "diamanosn-ea0a1",
-      storageBucket: "diamanosn-ea0a1.appspot.com",
-      messagingSenderId: "539088256476",
-      appId: "1:539088256476:web:4cf2a2b5cf0eef5197e849"
+      storageBucket: "diamanosn-ea0a1.firebasestorage.app",
+      messagingSenderId: "480059418031",
+      appId: "1:480059418031:web:bb071481468f52202e3b5a"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
     function fmtPrice(n) {
       return n.toLocaleString('fr-SN', { style: 'currency', currency: 'XOF' }).replace('FCFA', '').trim();
@@ -262,7 +263,7 @@
       const container = document.getElementById('ordersList');
       container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Chargement de vos commandes...</p></div>';
 
-      auth.onAuthStateChanged(async (user) => {
+      onAuthStateChanged(auth, (user) => {
         if (!user) {
           container.innerHTML = `
             <div class="empty-state">
@@ -275,55 +276,75 @@
         }
 
         try {
-          const response = await fetch(`https://diamonobackend.onrender.com/api/orders/user/${user.uid}`, {
-            headers: { 'Authorization': `Bearer ${await user.getIdToken()}` }
-          });
-          const data = await response.json();
-          const orders = data.orders || [];
-
-          if (orders.length === 0) {
+          // 📡 REAL-TIME LISTENER: Écoute les commandes de l'utilisateur PAR EMAIL
+          // (car customerEmail est utilisé au lieu de userId)
+          if (!user.email) {
             container.innerHTML = `
               <div class="empty-state">
-                <div class="empty-icon">🛒</div>
-                <div class="empty-title">Aucune commande</div>
-                <div class="empty-sub">Vous n'avez pas encore passé de commande</div>
-                <button class="shop-btn" onclick="window.location.href='index.html'">🛍️ Découvrir les produits</button>
+                <div class="empty-icon">⚠️</div>
+                <div class="empty-title">Email manquant</div>
+                <div class="empty-sub">Votre profil n'a pas d'email. Contactez le support.</div>
               </div>`;
             return;
           }
 
-          container.innerHTML = orders.map(order => {
-            const createdDate = new Date(order.createdAt).toLocaleDateString('fr-FR', {
-              day: '2-digit',
-              month: 'long',
-              year: 'numeric'
+          console.log('📡 Recherche des commandes pour:', user.email);
+          const ordersQuery = query(collection(db, 'orders'), where('customerEmail', '==', user.email));
+          onSnapshot(ordersQuery, (querySnapshot) => {
+            console.log('📡 Mise à jour en temps réel - Commandes:', querySnapshot.docs.length);
+            
+            const orders = [];
+            querySnapshot.forEach(doc => {
+              orders.push({ id: doc.id, ...doc.data() });
             });
-            const itemsText = order.items.length === 1 ? '1 article' : `${order.items.length} articles`;
-            return `
-              <div class="order-card" onclick="window.location.href='order-tracking.html?id=${order.id}'">
-                <div class="order-header">
-                  <div>
-                    <div class="order-ref">${order.orderRef}</div>
-                    <div class="order-date">${createdDate}</div>
+
+            // Trier par date décroissante
+            orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            if (orders.length === 0) {
+              container.innerHTML = `
+                <div class="empty-state">
+                  <div class="empty-icon">🛒</div>
+                  <div class="empty-title">Aucune commande</div>
+                  <div class="empty-sub">Vous n'avez pas encore passé de commande</div>
+                  <button class="shop-btn" onclick="window.location.href='index.html'">🛍️ Découvrir les produits</button>
+                </div>`;
+              return;
+            }
+
+            container.innerHTML = orders.map(order => {
+              const createdDate = new Date(order.createdAt).toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric'
+              });
+              const itemsText = order.items.length === 1 ? '1 article' : `${order.items.length} articles`;
+              return `
+                <div class="order-card" onclick="window.location.href='order-tracking.html?id=${order.id}'">
+                  <div class="order-header">
+                    <div>
+                      <div class="order-ref">${order.orderRef}</div>
+                      <div class="order-date">${createdDate}</div>
+                    </div>
+                    <span class="status-badge ${getStatusBadgeClass(order.status)}">${getStatusLabel(order.status)}</span>
                   </div>
-                  <span class="status-badge ${getStatusBadgeClass(order.status)}">${getStatusLabel(order.status)}</span>
-                </div>
-                <div class="order-body">
-                  <div>
-                    <div class="order-info-label">📦 Articles</div>
-                    <div class="order-items">${itemsText}</div>
+                  <div class="order-body">
+                    <div>
+                      <div class="order-info-label">📦 Articles</div>
+                      <div class="order-items">${itemsText}</div>
+                    </div>
+                    <div>
+                      <div class="order-info-label">👤 Adresse</div>
+                      <div class="order-customer">${order.address}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div class="order-info-label">👤 Adresse</div>
-                    <div class="order-customer">${order.address}</div>
+                  <div class="order-total">
+                    <span class="total-label">Montant total:</span>
+                    <span class="total-amount">${fmtPrice(order.totalAmount)}</span>
                   </div>
-                </div>
-                <div class="order-total">
-                  <span class="total-label">Montant total:</span>
-                  <span class="total-amount">${fmtPrice(order.totalAmount)}</span>
-                </div>
-              </div>`;
-          }).join('');
+                </div>`;
+            }).join('');
+          });
         } catch (error) {
           console.error('Erreur:', error);
           container.innerHTML = `

@@ -5333,9 +5333,69 @@ function renderOrdersHistory(orders) {
 }
 
 function showOrders() {
-  const orders = JSON.parse(localStorage.getItem('diamanoOrders') || '[]');
-  renderOrdersHistory(orders);
-  if(!orders.length) toast('📭 Aucune commande passée');
+  // Si pas de currentUser, afficher vide
+  if (!currentUser || !currentUser.email) {
+    const orders = JSON.parse(localStorage.getItem('diamanoOrders') || '[]');
+    renderOrdersHistory(orders);
+    return;
+  }
+
+  // Charger les commandes de Firestore EN TEMPS RÉEL
+  (async () => {
+    try {
+      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js");
+      const { getFirestore, collection, query, where, onSnapshot } = await import("https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js");
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
+        authDomain: "diamanosn-ea0a1.firebaseapp.com",
+        projectId: "diamanosn-ea0a1",
+        storageBucket: "diamanosn-ea0a1.firebasestorage.app",
+        messagingSenderId: "480059418031",
+        appId: "1:480059418031:web:bb071481468f52202e3b5a"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      // 📡 LISTENER TEMPS RÉEL: Rechercher les commandes par email
+      const ordersQuery = query(collection(db, 'orders'), where('customerEmail', '==', currentUser.email));
+      
+      onSnapshot(ordersQuery, (querySnapshot) => {
+        console.log('📡 Mise à jour en temps réel - Commandes Firestore:', querySnapshot.docs.length);
+        
+        const orders = [];
+        querySnapshot.forEach(doc => {
+          const data = doc.data();
+          orders.push({
+            ref: data.orderRef,
+            date: new Date(data.createdAt).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'numeric'}),
+            items: data.items ? data.items.length : 0,
+            total: fmtPrice(data.totalAmount || 0),
+            payment: data.paymentMethod === 'delivery' ? 'livraison' : 'senepay',
+            address: data.address,
+            status: {
+              pending_payment: 'pending',
+              confirmed: 'processing',
+              shipped: 'processing',
+              delivered: 'delivered',
+              cancelled: 'cancelled'
+            }[data.status] || 'pending'
+          });
+        });
+
+        // Trier par date décroissante
+        orders.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        renderOrdersHistory(orders);
+      });
+    } catch(e) {
+      console.error('Erreur Firestore:', e);
+      // Fallback: charger du localStorage
+      const orders = JSON.parse(localStorage.getItem('diamanoOrders') || '[]');
+      renderOrdersHistory(orders);
+    }
+  })();
 }
 
 function showAddresses() { toast('📍 Fonctionnalité adresses — Bientôt disponible'); }

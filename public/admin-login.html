@@ -347,12 +347,29 @@
         let firebaseConfig = null;
         let auth = null;
 
-        // Fetch Firebase config from server
+        // Fetch Firebase config from server (with fallback)
         async function loadFirebaseConfig() {
             try {
-                const response = await fetch('/api/config/firebase');
-                firebaseConfig = await response.json();
-                console.log('✅ Firebase config loaded:', firebaseConfig.projectId);
+                try {
+                    const response = await fetch('/api/config/firebase');
+                    if (response.ok) {
+                        firebaseConfig = await response.json();
+                        console.log('✅ Firebase config loaded from server:', firebaseConfig.projectId);
+                    } else {
+                        throw new Error('Server response not ok');
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Could not load from server, using fallback config');
+                    // Fallback config if server fails
+                    firebaseConfig = {
+                        apiKey: "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
+                        authDomain: "diamanosn-ea0a1.firebaseapp.com",
+                        projectId: "diamanosn-ea0a1",
+                        storageBucket: "diamanosn-ea0a1.firebasestorage.app",
+                        messagingSenderId: "480059418031",
+                        appId: "1:480059418031:web:bb071481468f52202e3b5a"
+                    };
+                }
                 
                 // Initialize Firebase after config is loaded
                 try {
@@ -370,11 +387,11 @@
                     }
                 } catch (error) {
                     console.error('❌ Firebase initialization error:', error);
-                    showAlert('Erreur d\'initialisation Firebase', 'danger');
+                    showAlert('Erreur d\'initialisation Firebase: ' + error.message, 'danger');
                 }
             } catch (error) {
                 console.error('❌ Error loading Firebase config:', error);
-                showAlert('Erreur lors du chargement de la configuration Firebase', 'danger');
+                showAlert('Erreur lors du chargement de la configuration Firebase: ' + error.message, 'danger');
             }
         }
 
@@ -406,9 +423,13 @@
                 loginText.style.display = 'none';
                 loadingSpinner.style.display = 'inline-block';
 
+                console.log('🔐 Tentative de connexion avec email:', email);
+                console.log('📊 Firebase config utilisée:', firebaseConfig);
+                
                 const userCredential = await auth.signInWithEmailAndPassword(email, password);
                 
                 // Check if user is admin (you can add admin check logic here)
+                console.log('✅ Connexion réussie:', userCredential.user.email);
                 showAlert('Connexion réussie!', 'success');
                 
                 setTimeout(() => {
@@ -420,7 +441,12 @@
                 loginText.style.display = 'inline';
                 loadingSpinner.style.display = 'none';
 
-                console.error('Login error:', error);
+                console.error('❌ Erreur de connexion complète:', {
+                    code: error.code,
+                    message: error.message,
+                    errorFull: error,
+                    configUsed: firebaseConfig
+                });
                 
                 let message = 'Erreur lors de la connexion';
                 if (error.code === 'auth/user-not-found') {

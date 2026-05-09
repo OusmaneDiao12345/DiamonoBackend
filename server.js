@@ -223,7 +223,26 @@ const verifyFirebaseToken = async (req, res, next) => {
 };
 
 // ==========================================
-// 💳 PAIEMENTS - SENEPAY ROUTES
+// � CONFIG ROUTES
+// ==========================================
+
+/**
+ * GET /api/config/firebase
+ * Retourner la configuration Firebase publique pour le frontend
+ */
+app.get('/api/config/firebase', (req, res) => {
+    res.json({
+        apiKey: "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
+        authDomain: "diamanosn-ea0a1.firebaseapp.com",
+        projectId: "diamanosn-ea0a1",
+        storageBucket: "diamanosn-ea0a1.firebasestorage.app",
+        messagingSenderId: "480059418031",
+        appId: "1:480059418031:web:bb071481468f52202e3b5a"
+    });
+});
+
+// ==========================================
+// �💳 PAIEMENTS - SENEPAY ROUTES
 // ==========================================
 
 /**
@@ -829,15 +848,15 @@ app.post('/api/init/products', async (req, res) => {
  */
 app.post('/api/orders/create', async (req, res) => {
     try {
-        const { userId, items, totalAmount, address, paymentMethod, customerName, customerPhone, customerEmail } = req.body;
+        const { userId, items, totalAmount, address, paymentMethod, customerName, customerPhone, customerEmail, orderRef: clientOrderRef } = req.body;
 
         // Validations
         if (!userId || !items || items.length === 0 || !totalAmount) {
             return res.status(400).json({ error: 'Données de commande invalides' });
         }
 
-        // Générer une référence unique
-        const orderRef = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+        // Utiliser la référence du client ou générer une nouvelle
+        const orderRef = clientOrderRef || `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
         // Créer le document commande
         const orderData = {
@@ -931,10 +950,18 @@ app.post('/api/orders/create', async (req, res) => {
                     </tbody>
                 </table>
 
+                <div style="text-align: center; margin: 25px 0;">
+                    <a href="${process.env.FRONTEND_URL || 'https://diamanosn.sn'}/track-order.html?ref=${orderRef}" 
+                       style="display: inline-block; background: #0d9488; color: white; padding: 15px 30px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+                        📦 Suivre ma Commande
+                    </a>
+                </div>
+
                 <div style="background: #eff6ff; padding: 15px; border-radius: 6px; border-left: 4px solid #3b82f6; margin: 20px 0;">
                     <p style="margin: 0; color: #1e40af;"><strong>💳 Prochaines Étapes:</strong></p>
                     <p style="margin: 8px 0; color: #1e40af;">Vous recevrez bientôt un email avec le lien de paiement sécurisé SenePay.</p>
                     <p style="margin: 8px 0; color: #1e40af;">Une fois le paiement confirmé, votre commande sera traitée rapidement.</p>
+                    <p style="margin: 8px 0; color: #1e40af;">Vous recevrez une notification à chaque mise à jour de votre commande.</p>
                 </div>
 
                 <div style="background: #fef3c7; padding: 15px; border-radius: 6px; border-left: 4px solid #f59e0b; margin: 20px 0;">
@@ -1065,6 +1092,15 @@ app.patch('/api/admin/orders/:orderId', verifyFirebaseToken, async (req, res) =>
             return res.status(400).json({ error: 'Statut requis' });
         }
 
+        // Récupérer la commande actuelle pour avoir les infos du client
+        const orderDoc = await db.collection('orders').doc(orderId).get();
+        if (!orderDoc.exists) {
+            return res.status(404).json({ error: 'Commande non trouvée' });
+        }
+
+        const orderData = orderDoc.data();
+        const oldStatus = orderData.status;
+
         const updateData = {
             status: status,
             updatedAt: new Date().toISOString()
@@ -1076,11 +1112,124 @@ app.patch('/api/admin/orders/:orderId', verifyFirebaseToken, async (req, res) =>
 
         await db.collection('orders').doc(orderId).update(updateData);
 
-        console.log('✅ Commande mise à jour:', orderId, 'Statut:', status);
+        console.log('✅ Commande mise à jour:', orderId, 'Statut:', oldStatus, '→', status);
+
+        // ===== ENVOYER UN EMAIL AU CLIENT SI LE STATUT CHANGE =====
+        if (oldStatus !== status && orderData.customerEmail) {
+            const statusLabels = {
+                'pending': '⏳ En attente de paiement',
+                'pending_payment': '⏳ En attente de paiement',
+                'confirmed': '✅ Confirmée - En cours de préparation',
+                'shipped': '📦 Expédiée - En route vers vous!',
+                'delivered': '✓ Livrée - Merci de votre confiance!',
+                'cancelled': '❌ Annulée'
+            };
+
+            const statusEmojis = {
+                'pending': '⏳',
+                'pending_payment': '⏳',
+                'confirmed': '✅',
+                'shipped': '📦',
+                'delivered': '✓',
+                'cancelled': '❌'
+            };
+
+            const statusMessages = {
+                'pending': 'Votre commande est en attente. Nous vous enverrons un lien de paiement bientôt.',
+                'pending_payment': 'Votre commande est prête. Veuillez effectuer le paiement pour la valider.',
+                'confirmed': 'Excellentes nouvelles! Votre paiement a été reçu et votre commande est en cours de préparation.',
+                'shipped': 'Votre commande a été expédiée! Vous pouvez la suivre avec le numéro de suivi fourni.',
+                'delivered': 'Votre commande a été livrée! Merci d\'avoir choisi DiamanoSN.',
+                'cancelled': 'Votre commande a été annulée. Si vous avez des questions, contactez-nous.'
+            };
+
+            const statusColors = {
+                'pending': '#fbbf24',
+                'pending_payment': '#fbbf24',
+                'confirmed': '#10b981',
+                'shipped': '#3b82f6',
+                'delivered': '#8b5cf6',
+                'cancelled': '#ef4444'
+            };
+
+            const clientEmailContent = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h2 style="color: ${statusColors[status] || '#0d9488'}; margin: 0; font-size: 28px;">
+                            ${statusEmojis[status] || '📦'} Mise à jour de votre Commande
+                        </h2>
+                        <p style="color: #666; margin-top: 10px;">Référence: <strong>${orderData.orderRef}</strong></p>
+                    </div>
+
+                    <div style="background: ${statusColors[status] || '#0d9488'}15; padding: 15px; border-radius: 6px; border-left: 4px solid ${statusColors[status] || '#0d9488'}; margin: 20px 0;">
+                        <p style="margin: 0; color: ${statusColors[status] || '#0d9488'}; font-weight: bold; font-size: 18px;">
+                            ${statusLabels[status] || status}
+                        </p>
+                        <p style="margin: 10px 0 0 0; color: #555;">
+                            ${statusMessages[status] || 'Votre commande a été mise à jour.'}
+                        </p>
+                    </div>
+
+                    <div style="background: #f8fafc; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                        <p style="margin: 8px 0;"><strong>📦 Votre Commande:</strong> ${orderData.orderRef}</p>
+                        <p style="margin: 8px 0;"><strong>💰 Total:</strong> ${orderData.totalAmount.toLocaleString('fr-SN')} FCFA</p>
+                        <p style="margin: 8px 0;"><strong>📍 Adresse:</strong> ${orderData.address || 'Non spécifiée'}</p>
+                        <p style="margin: 8px 0;"><strong>📅 Date:</strong> ${new Date(orderData.createdAt).toLocaleDateString('fr-SN')}</p>
+                        ${orderData.notes ? `<p style="margin: 8px 0;"><strong>📝 Notes:</strong> ${orderData.notes}</p>` : ''}
+                    </div>
+
+                    <h3 style="color: #0d9488; margin-top: 20px;">📋 Détails de votre Commande:</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: ${statusColors[status] || '#0d9488'}; color: white;">
+                                <th style="padding: 12px; text-align: left;">Produit</th>
+                                <th style="padding: 12px; text-align: center;">Qté</th>
+                                <th style="padding: 12px; text-align: right;">Prix</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${orderData.items.map((item, idx) => `
+                                <tr style="border-bottom: 1px solid #eee; ${idx % 2 === 0 ? 'background: #f8fafc;' : ''}">
+                                    <td style="padding: 12px;">${item.name}</td>
+                                    <td style="padding: 12px; text-align: center;">${item.qty}</td>
+                                    <td style="padding: 12px; text-align: right;">${(item.price * item.qty).toLocaleString('fr-SN')} FCFA</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+
+                    <div style="background: #fef3c7; padding: 15px; border-radius: 6px; border-left: 4px solid #f59e0b; margin: 20px 0;">
+                        <p style="margin: 0;"><strong>📞 Besoin d'aide?</strong></p>
+                        <p style="margin: 8px 0;">Contactez-nous sur WhatsApp: <a href="https://wa.me/221773632458" style="color: #0d9488; text-decoration: none;">+221 77 363 24 58</a></p>
+                    </div>
+
+                    <p style="color: #666; text-align: center; margin-top: 30px; font-size: 12px;">
+                        © 2026 DiamanoSN - Le Grand Bazar du Sénégal
+                    </p>
+                </div>
+            `;
+
+            // Envoyer l'email au client en arrière-plan
+            sendEmail(orderData.customerEmail, `${statusEmojis[status] || '📦'} Mise à jour: ${statusLabels[status] || status}`, clientEmailContent);
+
+            // Envoyer un email à l'admin aussi
+            const adminStatusEmail = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+                    <h2 style="color: #0d9488;">Commande Mise à Jour</h2>
+                    <p><strong>Référence:</strong> ${orderData.orderRef}</p>
+                    <p><strong>Client:</strong> ${orderData.customerName}</p>
+                    <p><strong>Ancien Statut:</strong> ${statusLabels[oldStatus] || oldStatus}</p>
+                    <p><strong>Nouveau Statut:</strong> ${statusLabels[status] || status}</p>
+                    <p><strong>Montant:</strong> ${orderData.totalAmount.toLocaleString('fr-SN')} FCFA</p>
+                    ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+                </div>
+            `;
+            sendEmail(ADMIN_EMAIL, `Mise à jour commande: ${orderData.orderRef}`, adminStatusEmail);
+        }
 
         res.json({
             success: true,
-            message: 'Commande mise à jour',
+            message: 'Commande mise à jour et email envoyé au client',
             orderId: orderId,
             status: status
         });
@@ -1214,12 +1363,12 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
 // ==========================================
 app.get('/api/config/firebase', (req, res) => {
     res.json({
-        apiKey: process.env.FIREBASE_API_KEY || "AIzaSyAKh7xMUjvN0V2X3Q4R5S6T7U8V9W0X1Y2Z",
+        apiKey: process.env.FIREBASE_API_KEY || "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
         authDomain: `${process.env.FIREBASE_PROJECT_ID || 'diamanosn-ea0a1'}.firebaseapp.com`,
         projectId: process.env.FIREBASE_PROJECT_ID || 'diamanosn-ea0a1',
-        storageBucket: `${process.env.FIREBASE_PROJECT_ID || 'diamanosn-ea0a1'}.appspot.com`,
-        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "104015846341111283274",
-        appId: process.env.FIREBASE_APP_ID || "1:104015846341111283274:web:abc123def456ghi789jkl"
+        storageBucket: `${process.env.FIREBASE_PROJECT_ID || 'diamanosn-ea0a1'}.firebasestorage.app`,
+        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "480059418031",
+        appId: process.env.FIREBASE_APP_ID || "1:480059418031:web:bb071481468f52202e3b5a"
     });
 });
 

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Testeur de Configuration Firebase</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { color: #333; margin-bottom: 10px; font-size: 28px; }
+        .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 8px;
+        }
+        
+        .test-item {
+            margin: 10px 0;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .status {
+            font-weight: bold;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        
+        .status.ok { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.pending { background: #fff3cd; color: #856404; }
+        
+        .code-block {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 10px 0;
+            overflow-x: auto;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 10px 5px 10px 0;
+            transition: all 0.3s;
+        }
+        
+        button:hover { background: #764ba2; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        
+        .icon {
+            font-size: 20px;
+        }
+        
+        .result-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f0f4ff;
+            border-radius: 8px;
+        }
+        
+        hr { margin: 20px 0; border: none; border-top: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Testeur de Configuration Firebase</h1>
+        <p class="subtitle">Diagnostiquez les problèmes de connexion Firebase</p>
+        
+        <div class="test-section">
+            <h3>📋 Configuration Détectée</h3>
+            <div class="test-item" id="apiKey">
+                <span class="icon">🔑</span>
+                <span>API Key</span>
+                <span class="status pending">Chargement...</span>
+            </div>
+            <div class="test-item" id="projectId">
+                <span class="icon">📁</span>
+                <span>Project ID</span>
+                <span class="status pending">Chargement...</span>
+            </div>
+            <div class="test-item" id="authDomain">
+                <span class="icon">🌐</span>
+                <span>Auth Domain</span>
+                <span class="status pending">Chargement...</span>
+            </div>
+            <div class="code-block" id="configDisplay"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>🧪 Tests de Connectivité</h3>
+            <button onclick="testServerConfig()">🔗 Tester Endpoint /api/config/firebase</button>
+            <button onclick="testFirebaseSDK()">🔥 Tester Firebase SDK</button>
+            <button onclick="testCORS()">🚀 Tester CORS</button>
+            <button onclick="clearConsole()">🗑️ Effacer Console</button>
+            <div class="code-block" id="testResults"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>👤 Test de Connexion</h3>
+            <input type="email" id="testEmail" placeholder="Email (ex: admin@diamanosn.sn)" style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
+            <input type="password" id="testPassword" placeholder="Mot de passe" style="width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px;">
+            <button onclick="testLogin()">🔐 Essayer Connexion</button>
+            <div class="code-block" id="loginResults"></div>
+        </div>
+        
+        <hr>
+        
+        <div style="text-align: center; color: #666; font-size: 12px;">
+            <p>💡 Conseil: Ouvrez la Console (F12) pour voir les détails complets</p>
+            <p style="margin-top: 10px;">Si tous les tests échouent, vérifiez:</p>
+            <ul style="display: inline-block; text-align: left; margin-top: 10px;">
+                <li>Le serveur Node.js fonctionne sur port 3000</li>
+                <li>La clé API Firebase est valide</li>
+                <li>Le projet Firebase existe</li>
+                <li>L'authentification Email/Password est activée</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
+        
+        // Make functions global so HTML buttons can call them
+        window.firebaseModules = { initializeApp, getAuth, signInWithEmailAndPassword };
+    </script>
+    
+    <script>
+        let firebaseConfig = null;
+        let auth = null;
+        
+        const resultsDiv = document.getElementById('testResults');
+        const loginResultsDiv = document.getElementById('loginResults');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const icon = type === 'error' ? '❌' : type === 'ok' ? '✅' : 'ℹ️';
+            const line = `[${timestamp}] ${icon} ${message}`;
+            console.log(line);
+            resultsDiv.innerHTML += line + '\n';
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+        
+        function logLogin(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const icon = type === 'error' ? '❌' : type === 'ok' ? '✅' : 'ℹ️';
+            const line = `[${timestamp}] ${icon} ${message}`;
+            console.log(line);
+            loginResultsDiv.innerHTML += line + '\n';
+            loginResultsDiv.scrollTop = loginResultsDiv.scrollHeight;
+        }
+        
+        function clearConsole() {
+            resultsDiv.innerHTML = '';
+            loginResultsDiv.innerHTML = '';
+            console.clear();
+        }
+        
+        // Charger et afficher la configuration
+        async function loadConfig() {
+            try {
+                // Essayer depuis le serveur d'abord
+                const response = await fetch('/api/config/firebase');
+                if (response.ok) {
+                    firebaseConfig = await response.json();
+                    log('✅ Configuration chargée depuis le serveur', 'ok');
+                } else {
+                    throw new Error('Serveur a retourné une erreur');
+                }
+            } catch (err) {
+                log('⚠️ Impossible de charger depuis serveur, utilisation config fallback', 'info');
+                firebaseConfig = {
+                    apiKey: "AIzaSyDl7L_kB_AqUJvG2aQTXJ4RRJjAA9U0TaA",
+                    authDomain: "diamanosn-ea0a1.firebaseapp.com",
+                    projectId: "diamanosn-ea0a1",
+                    storageBucket: "diamanosn-ea0a1.appspot.com",
+                    messagingSenderId: "918076707387",
+                    appId: "1:918076707387:web:dac8ce0fbc5d90f80f5c05"
+                };
+            }
+            
+            // Afficher les détails
+            displayConfig();
+        }
+        
+        function displayConfig() {
+            if (!firebaseConfig) return;
+            
+            const items = [
+                { id: 'apiKey', label: 'API Key', value: firebaseConfig.apiKey },
+                { id: 'projectId', label: 'Project ID', value: firebaseConfig.projectId },
+                { id: 'authDomain', label: 'Auth Domain', value: firebaseConfig.authDomain }
+            ];
+            
+            items.forEach(item => {
+                const el = document.getElementById(item.id);
+                const status = el.querySelector('.status');
+                status.textContent = value ? '✅ Présent' : '❌ Manquant';
+                status.className = 'status ' + (value ? 'ok' : 'error');
+                el.innerHTML = `
+                    <span class="icon">📋</span>
+                    <span>${item.label}</span>
+                    ${status.outerHTML}
+                `;
+            });
+            
+            document.getElementById('configDisplay').textContent = JSON.stringify(firebaseConfig, null, 2);
+        }
+        
+        async function testServerConfig() {
+            log('🔗 Test de l\'endpoint serveur...');
+            try {
+                const response = await fetch('/api/config/firebase');
+                log(`   Status: ${response.status}`, response.ok ? 'ok' : 'error');
+                const data = await response.json();
+                log(`   API Key reçue: ${data.apiKey?.substring(0, 20)}...`, 'ok');
+            } catch (err) {
+                log(`   Erreur: ${err.message}`, 'error');
+            }
+        }
+        
+        async function testFirebaseSDK() {
+            log('🔥 Test d\'initialisation Firebase SDK...');
+            try {
+                if (firebaseConfig) {
+                    const { initializeApp, getAuth } = window.firebaseModules;
+                    const app = initializeApp(firebaseConfig);
+                    log('   ✅ Firebase App initialisée', 'ok');
+                    
+                    auth = getAuth(app);
+                    log('   ✅ Firebase Auth initialisée', 'ok');
+                    log('   Prêt pour les tests de connexion', 'ok');
+                } else {
+                    log('   ❌ Erreur: Config non disponible', 'error');
+                }
+            } catch (err) {
+                log(`   ❌ Erreur: ${err.message}`, 'error');
+            }
+        }
+        
+        async function testCORS() {
+            log('🚀 Test CORS...');
+            try {
+                const response = await fetch('/', {
+                    method: 'GET',
+                    headers: { 'Accept': 'text/html' }
+                });
+                log(`   Status: ${response.status}`, response.ok ? 'ok' : 'error');
+            } catch (err) {
+                log(`   Erreur: ${err.message}`, 'error');
+            }
+        }
+        
+        async function testLogin() {
+            const email = document.getElementById('testEmail').value;
+            const password = document.getElementById('testPassword').value;
+            
+            if (!email || !password) {
+                logLogin('❌ Veuillez remplir email et mot de passe', 'error');
+                return;
+            }
+            
+            logLogin(`🔐 Tentative de connexion: ${email}...`);
+            
+            try {
+                // Initialiser Firebase si nécessaire
+                if (!auth && firebaseConfig) {
+                    const { initializeApp, getAuth } = window.firebaseModules;
+                    const app = initializeApp(firebaseConfig);
+                    auth = getAuth(app);
+                    logLogin('📱 Firebase initialisé', 'ok');
+                }
+                
+                if (!auth) {
+                    logLogin('❌ Firebase Auth non initialisée', 'error');
+                    return;
+                }
+                
+                const { signInWithEmailAndPassword } = window.firebaseModules;
+                logLogin('⏳ Envoi de la requête de connexion...', 'info');
+                
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                logLogin(`✅ Connexion réussie! Utilisateur: ${userCredential.user.email}`, 'ok');
+                logLogin(`   UID: ${userCredential.user.uid}`, 'ok');
+                
+            } catch (err) {
+                logLogin(`❌ Erreur: ${err.code || 'Erreur inconnue'}`, 'error');
+                logLogin(`   Message: ${err.message}`, 'error');
+                
+                if (err.code === 'auth/user-not-found') {
+                    logLogin('   → Créez cet utilisateur dans Firebase Console', 'info');
+                } else if (err.code === 'auth/api-key-not-valid') {
+                    logLogin('   → La clé API n\'est pas valide, vérifiez Firebase Console', 'info');
+                } else if (err.code === 'auth/wrong-password') {
+                    logLogin('   → Le mot de passe est incorrect', 'info');
+                }
+            }
+        }
+        
+        // Charger config au démarrage
+        window.addEventListener('DOMContentLoaded', loadConfig);
+    </script>
+</body>
+</html>
