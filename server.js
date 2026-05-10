@@ -1530,20 +1530,6 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
 });
 
 // ==========================================
-// 🔐 FIREBASE CONFIG (PUBLIC - for client-side)
-// ==========================================
-app.get('/api/config/firebase', (req, res) => {
-    res.json({
-        apiKey: process.env.FIREBASE_API_KEY || "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
-        authDomain: `${process.env.FIREBASE_PROJECT_ID || 'diamanosn-ea0a1'}.firebaseapp.com`,
-        projectId: process.env.FIREBASE_PROJECT_ID || 'diamanosn-ea0a1',
-        storageBucket: `${process.env.FIREBASE_PROJECT_ID || 'diamanosn-ea0a1'}.firebasestorage.app`,
-        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "480059418031",
-        appId: process.env.FIREBASE_APP_ID || "1:480059418031:web:bb071481468f52202e3b5a"
-    });
-});
-
-// ==========================================
 // 🏥 HEALTH CHECK
 // ==========================================
 app.get('/api/health', (req, res) => {
