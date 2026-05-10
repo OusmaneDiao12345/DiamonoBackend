@@ -241,6 +241,61 @@ app.get('/api/config/firebase', (req, res) => {
     });
 });
 
+/**
+ * GET /api/test-email
+ * Tester l'envoi d'emails (diagnostique)
+ */
+app.get('/api/test-email', async (req, res) => {
+    try {
+        const testEmail = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #0d9488; border-radius: 8px; padding: 20px; background: #f0fdf4;">
+                <h2 style="color: #0d9488; text-align: center;">✅ Test Email DiamanoSN</h2>
+                <p>Cet email est un test pour vérifier que le système d'email fonctionne correctement en production.</p>
+                
+                <div style="background: white; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                    <p><strong>Configuration Email Status:</strong></p>
+                    <ul style="list-style: none; padding: 0;">
+                        <li>${process.env.GMAIL_USER ? '✅' : '❌'} Gmail: ${process.env.GMAIL_USER || 'Non configuré'}</li>
+                        <li>${process.env.EMAIL_SERVICE === 'brevo' ? '✅' : '❌'} Brevo: ${process.env.EMAIL_SERVICE === 'brevo' ? 'Activé' : 'Non activé'}</li>
+                        <li>${emailTransporter ? '✅' : '❌'} Email Transporter: ${emailTransporter ? 'OK' : 'FAILED'}</li>
+                    </ul>
+                </div>
+
+                <div style="background: #dbeafe; padding: 15px; border-radius: 6px; border-left: 4px solid #3b82f6;">
+                    <p style="margin: 0;"><strong>🕐 Timestamp:</strong> ${new Date().toISOString()}</p>
+                </div>
+
+                <p style="color: #666; text-align: center; margin-top: 20px; font-size: 12px;">
+                    Cet email confirme que le système d'email fonctionne correctement.
+                </p>
+            </div>
+        `;
+
+        const success = await sendEmail(
+            req.query.email || ADMIN_EMAIL,
+            '🧪 Test Email DiamanoSN',
+            testEmail
+        );
+
+        res.json({
+            success: success,
+            message: success ? 'Email test envoyé avec succès!' : 'Erreur lors de l\'envoi du test email',
+            emailConfig: {
+                hasGmail: !!process.env.GMAIL_USER,
+                hasBrevo: process.env.EMAIL_SERVICE === 'brevo',
+                transporterStatus: emailTransporter ? 'OK' : 'FAILED',
+                adminEmail: ADMIN_EMAIL
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
+
 // ==========================================
 // �💳 PAIEMENTS - SENEPAY ROUTES
 // ==========================================
@@ -1286,6 +1341,67 @@ app.post('/api/contact', async (req, res) => {
 
         console.log('✅ Message de contact reçu:', contactRef.id, 'De:', email);
 
+        // 📧 ENVOYER UN EMAIL À L'ADMIN
+        const adminContactEmail = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+                <h2 style="color: #d97706; text-align: center;">📬 Nouveau Message de Contact</h2>
+                
+                <div style="background: #fef3c7; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                    <p><strong>Nom:</strong> ${name}</p>
+                    <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
+                    <p><strong>Téléphone:</strong> ${phone || 'Non fourni'}</p>
+                    <p><strong>Sujet:</strong> ${subject}</p>
+                </div>
+
+                <h3 style="color: #d97706;">Message:</h3>
+                <div style="background: #f8fafc; padding: 15px; border-radius: 6px; border-left: 4px solid #d97706; white-space: pre-wrap;">
+                    ${message}
+                </div>
+
+                <div style="margin-top: 20px; padding: 15px; background: #dbeafe; border-radius: 6px;">
+                    <p style="margin: 0;"><strong>📋 ID Message:</strong> ${contactRef.id}</p>
+                    <p style="margin: 8px 0;"><strong>🕐 Date:</strong> ${new Date(contactData.createdAt).toLocaleString('fr-SN')}</p>
+                </div>
+
+                <p style="color: #666; text-align: center; margin-top: 30px; font-size: 12px;">
+                    DiamanoSN © 2026 - Message automatique
+                </p>
+            </div>
+        `;
+
+        // Envoyer email admin EN ARRIÈRE-PLAN
+        sendEmail(ADMIN_EMAIL, `📬 Nouveau Contact: ${subject}`, adminContactEmail).catch(err => {
+            console.error('⚠️  Email admin contact non envoyé:', err.message);
+        });
+
+        // 📧 ENVOYER CONFIRMATION AU CLIENT
+        const clientConfirmEmail = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+                <h2 style="color: #0d9488; text-align: center;">✅ Message Reçu!</h2>
+                
+                <p>Bonjour ${name},</p>
+                <p>Merci de nous avoir contacté! Nous avons bien reçu votre message et vous répondrons dès que possible.</p>
+
+                <div style="background: #f0fdf4; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                    <p><strong>Votre Sujet:</strong> ${subject}</p>
+                    <p><strong>ID Demande:</strong> ${contactRef.id}</p>
+                </div>
+
+                <div style="background: #eff6ff; padding: 15px; border-radius: 6px; border-left: 4px solid #3b82f6;">
+                    <p style="margin: 0;"><strong>📞 Pour une réponse rapide:</strong></p>
+                    <p style="margin: 8px 0;">Contactez-nous sur WhatsApp: <a href="https://wa.me/221773632458" style="color: #0d9488; text-decoration: none;">+221 77 363 24 58</a></p>
+                </div>
+
+                <p style="color: #666; text-align: center; margin-top: 30px; font-size: 12px;">
+                    © 2026 DiamanoSN - Le Grand Bazar du Sénégal
+                </p>
+            </div>
+        `;
+
+        sendEmail(email.trim(), `✅ Confirmation: Votre message a été reçu`, clientConfirmEmail).catch(err => {
+            console.error('⚠️  Email confirmation client non envoyé:', err.message);
+        });
+
         res.json({
             success: true,
             message: 'Merci pour votre message. Nous vous répondrons bientôt!',
@@ -1343,6 +1459,61 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
         await db.collection('newsletter_subscribers').doc(email.trim().toLowerCase()).set(subscriberData, { merge: true });
 
         console.log('✅ Nouveau subscriber newsletter:', email);
+
+        // 📧 ENVOYER CONFIRMATION AU SUBSCRIBER
+        const subscriberConfirmEmail = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+                <h2 style="color: #0d9488; text-align: center;">✅ Bienvenue à la Newsletter!</h2>
+                
+                <p>Bonjour ${firstName || 'Abonné'},</p>
+                <p>Merci de votre abonnement! Vous allez maintenant recevoir nos dernières actualités, offres exclusives et produits en avant-première.</p>
+
+                <div style="background: #f0fdf4; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                    <p style="margin: 0;"><strong>📬 Vous êtes abonné avec l'email:</strong></p>
+                    <p style="margin: 8px 0; color: #0d9488;">${email.trim().toLowerCase()}</p>
+                </div>
+
+                <div style="background: #eff6ff; padding: 15px; border-radius: 6px; border-left: 4px solid #3b82f6;">
+                    <p style="margin: 0;"><strong>🎁 Avantages de l'abonnement:</strong></p>
+                    <ul style="margin: 8px 0; padding-left: 20px;">
+                        <li>Remises exclusives chaque semaine</li>
+                        <li>Accès aux ventes privées en avant-première</li>
+                        <li>Conseils et astuces mode</li>
+                        <li>Codes promotionnels réservés</li>
+                    </ul>
+                </div>
+
+                <p style="color: #666; text-align: center; margin-top: 30px; font-size: 12px;">
+                    © 2026 DiamanoSN - Le Grand Bazar du Sénégal
+                </p>
+            </div>
+        `;
+
+        // Envoyer confirmation au subscriber EN ARRIÈRE-PLAN
+        sendEmail(email.trim().toLowerCase(), '✅ Bienvenue à la Newsletter DiamanoSN!', subscriberConfirmEmail).catch(err => {
+            console.error('⚠️  Email confirmation subscriber non envoyé:', err.message);
+        });
+
+        // 📧 NOTIFIER L'ADMIN D'UN NOUVEAU SUBSCRIBER
+        const adminNewsletterEmail = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+                <h2 style="color: #0d9488; text-align: center;">📬 Nouveau Subscriber Newsletter</h2>
+                
+                <div style="background: #f0fdf4; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                    <p><strong>Email:</strong> ${email.trim().toLowerCase()}</p>
+                    <p><strong>Nom:</strong> ${firstName} ${lastName}</p>
+                    <p><strong>Date:</strong> ${new Date().toLocaleString('fr-SN')}</p>
+                </div>
+
+                <p style="color: #666; text-align: center; margin-top: 30px; font-size: 12px;">
+                    DiamanoSN © 2026 - Notification automatique
+                </p>
+            </div>
+        `;
+
+        sendEmail(ADMIN_EMAIL, `📬 Nouveau Subscriber Newsletter: ${email.trim().toLowerCase()}`, adminNewsletterEmail).catch(err => {
+            console.error('⚠️  Email admin newsletter non envoyé:', err.message);
+        });
 
         res.json({
             success: true,
