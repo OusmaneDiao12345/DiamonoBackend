@@ -100,7 +100,7 @@ async function sendEmail(to, subject, htmlContent) {
     try {
         if (!emailTransporter) {
             console.error('❌ Email transporter non configuré');
-            return false;
+            return { success: false, error: 'Email transporter non configuré' };
         }
 
         const mailOptions = {
@@ -110,16 +110,26 @@ async function sendEmail(to, subject, htmlContent) {
             html: htmlContent
         };
         
-        console.log('📧 Tentative envoi email à:', to);
+        console.log('📧 Tentative envoi email à:', to, 'via', process.env.EMAIL_SERVICE || 'Gmail');
         const info = await emailTransporter.sendMail(mailOptions);
         console.log('✅ Email envoyé avec succès:', info.response);
-        return true;
+        return { success: true, messageId: info.messageId };
     } catch (error) {
         console.error('❌ Erreur DÉTAILLÉE envoi email:');
         console.error('  Message:', error.message);
         console.error('  Code:', error.code);
+        console.error('  Response:', error.response);
+        console.error('  Command:', error.command);
         console.error('  Stack:', error.stack);
-        return false;
+        return { 
+            success: false, 
+            error: error.message,
+            details: {
+                code: error.code,
+                command: error.command,
+                response: error.response?.toString() || 'N/A'
+            }
+        };
     }
 }
 
@@ -281,32 +291,43 @@ app.get('/api/test-email', async (req, res) => {
             </div>
         `;
 
-        const success = await sendEmail(
+        const result = await sendEmail(
             req.query.email || ADMIN_EMAIL,
             '🧪 Test Email DiamanoSN',
             testEmail
         );
 
-        res.json({
-            success: success,
-            message: success ? 'Email test envoyé avec succès!' : 'Erreur lors de l\'envoi du test email',
-            emailConfig: {
-                hasGmail: !!process.env.GMAIL_USER,
-                hasBrevo: process.env.EMAIL_SERVICE === 'brevo',
-                transporterStatus: emailTransporter ? 'OK' : 'FAILED',
-                adminEmail: ADMIN_EMAIL
-            }
-        });
+        if (result.success) {
+            res.json({
+                success: true,
+                message: 'Email test envoyé avec succès!',
+                messageId: result.messageId,
+                emailConfig: {
+                    hasGmail: !!process.env.GMAIL_USER,
+                    hasBrevo: process.env.EMAIL_SERVICE === 'brevo',
+                    transporterStatus: 'OK',
+                    adminEmail: ADMIN_EMAIL
+                }
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'Erreur lors de l\'envoi du test email',
+                error: result.error,
+                errorDetails: result.details,
+                emailConfig: {
+                    hasGmail: !!process.env.GMAIL_USER,
+                    hasBrevo: process.env.EMAIL_SERVICE === 'brevo',
+                    transporterStatus: emailTransporter ? 'OK' : 'FAILED',
+                    adminEmail: ADMIN_EMAIL
+                }
+            });
+        }
     } catch (error) {
-        console.error('🧪 TEST EMAIL ERROR:', error);
+        console.error('🧪 TEST EMAIL EXCEPTION:', error);
         res.status(500).json({
             success: false,
             error: error.message,
-            errorDetails: {
-                code: error.code,
-                message: error.message,
-                response: error.response?.data || 'N/A'
-            },
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
@@ -1612,7 +1633,7 @@ app.post('/api/newsletter/send-bulk', async (req, res) => {
                 `;
 
                 const sent = await sendEmail(subscriber.email, subject, htmlContent);
-                if (sent) sentCount++;
+                if (sent.success) sentCount++;
                 else failedCount++;
             } catch (err) {
                 console.error('Erreur envoi email:', subscriber.email, err);
