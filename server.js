@@ -110,11 +110,15 @@ async function sendEmail(to, subject, htmlContent) {
             html: htmlContent
         };
         
+        console.log('📧 Tentative envoi email à:', to);
         const info = await emailTransporter.sendMail(mailOptions);
-        console.log('✅ Email envoyé:', info.response);
+        console.log('✅ Email envoyé avec succès:', info.response);
         return true;
     } catch (error) {
-        console.error('❌ Erreur envoi email:', error.message);
+        console.error('❌ Erreur DÉTAILLÉE envoi email:');
+        console.error('  Message:', error.message);
+        console.error('  Code:', error.code);
+        console.error('  Stack:', error.stack);
         return false;
     }
 }
@@ -247,6 +251,12 @@ app.get('/api/config/firebase', (req, res) => {
  */
 app.get('/api/test-email', async (req, res) => {
     try {
+        console.log('🧪 TEST EMAIL - Configuration:');
+        console.log('  EMAIL_SERVICE:', process.env.EMAIL_SERVICE);
+        console.log('  GMAIL_USER:', process.env.GMAIL_USER ? '✅ SET' : '❌ NOT SET');
+        console.log('  BREVO_API_KEY:', process.env.BREVO_API_KEY ? '✅ SET (length: ' + process.env.BREVO_API_KEY.length + ')' : '❌ NOT SET');
+        console.log('  emailTransporter:', emailTransporter ? '✅ READY' : '❌ NOT READY');
+
         const testEmail = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #0d9488; border-radius: 8px; padding: 20px; background: #f0fdf4;">
                 <h2 style="color: #0d9488; text-align: center;">✅ Test Email DiamanoSN</h2>
@@ -288,9 +298,15 @@ app.get('/api/test-email', async (req, res) => {
             }
         });
     } catch (error) {
+        console.error('🧪 TEST EMAIL ERROR:', error);
         res.status(500).json({
             success: false,
             error: error.message,
+            errorDetails: {
+                code: error.code,
+                message: error.message,
+                response: error.response?.data || 'N/A'
+            },
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
