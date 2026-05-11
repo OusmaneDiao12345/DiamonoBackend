@@ -6411,7 +6411,7 @@ function openFAQ() {
   toast('❓ FAQ - Consultez notre centre d\'aide');
 }
 
-function subscribeNewsletter() {
+function subscribeNewsletterOld() {
   const email = document.getElementById('newsletterEmail').value;
   if(email && email.includes('@')) {
     toast('✅ Merci pour votre inscription !');
@@ -6422,13 +6422,47 @@ function subscribeNewsletter() {
 }
 
 function subscribeNewsletterNew() {
-  const email = document.getElementById('newsletterEmailNew').value;
-  if(email && email.includes('@')) {
-    toast('✅ Merci pour votre inscription !');
-    document.getElementById('newsletterEmailNew').value = '';
-  } else {
-    toast('❌ Veuillez entrer un email valide');
+  const emailInput = document.getElementById('newsletterEmailNew');
+  if (!emailInput) return;
+
+  const email = emailInput.value.trim();
+
+  if (!email || !email.includes('@')) {
+    showToast('❌ Veuillez entrer une adresse email valide', 'error');
+    return;
   }
+
+  const btn = event.target;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ En cours...';
+
+  fetch(API_URL + '/newsletter/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: email,
+      firstName: '',
+      lastName: ''
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      emailInput.value = '';
+      showToast('✅ Merci pour votre abonnement! 🎁', 'success');
+    } else {
+      showToast('❌ ' + (data.error || 'Erreur lors de l\'abonnement'), 'error');
+    }
+  })
+  .catch(err => {
+    console.error('Newsletter subscribe error:', err);
+    showToast('❌ Erreur réseau. Réessayez plus tard.', 'error');
+  })
+  .finally(() => {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  });
 }
 
 function openPromoPopup() {
