@@ -561,10 +561,58 @@
     </div>
 </div>
 
-<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-app.js" defer></script>
-<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-auth.js" defer></script>
-<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-firestore.js" defer></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-app.js" async></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-auth.js" async></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-firestore.js" async></script>
 <script>
+// Define functions globally BEFORE Firebase init
+let currentUser = null;
+let vendorData = null;
+let firebaseReady = false;
+
+function switchSection(section) {
+    document.getElementById('overviewSection').style.display = 'none';
+    document.getElementById('productsSection').style.display = 'none';
+    document.getElementById('ordersSection').style.display = 'none';
+    document.getElementById('earningsSection').style.display = 'none';
+    document.getElementById('settingsSection').style.display = 'none';
+    document.getElementById(section + 'Section').style.display = 'block';
+    document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+    if (event && event.target) event.target.closest('.sidebar-item').classList.add('active');
+}
+
+function openAddProductModal() {
+    const modal = document.getElementById('productModal');
+    if (modal) modal.classList.add('open');
+}
+
+function closeProductModal() {
+    const modal = document.getElementById('productModal');
+    if (modal) modal.classList.remove('open');
+    const fields = ['productName', 'productDescription', 'productPrice', 'productStock'];
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+}
+
+function saveProduct() {
+    alert('💾 Fonctionnalité à implémenter - Ajouter produit à votre boutique');
+    closeProductModal();
+}
+
+function logout() {
+    if (firebaseReady && typeof firebase !== 'undefined') {
+        const auth = firebase.auth();
+        auth.signOut().then(() => {
+            window.location.href = 'index.html';
+        });
+    } else {
+        window.location.href = 'index.html';
+    }
+}
+
+// Firebase config
 const firebaseConfig = {
     apiKey: "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
     authDomain: "diamanosn-ea0a1.firebaseapp.com",
@@ -574,110 +622,56 @@ const firebaseConfig = {
     appId: "1:480059418031:web:bb071481468f52202e3b5a"
 };
 
-// Polling approach to wait for Firebase
+// Check Firebase availability with polling
 let firebaseRetries = 0;
-const maxRetries = 30; // 30 * 500ms = 15 seconds max wait
+const maxRetries = 40; // 40 * 250ms = 10 seconds
 
-function checkAndInitializeFirebase() {
-    if (typeof firebase !== 'undefined') {
-        console.log('✅ Firebase loaded successfully');
-        initializeApp();
-        return;
+function initializeFirebase() {
+    if (typeof firebase !== 'undefined' && firebase.apps.length === 0) {
+        console.log('✅ Firebase loaded, initializing...');
+        try {
+            const app = firebase.initializeApp(firebaseConfig);
+            const auth = firebase.auth();
+            
+            auth.onAuthStateChanged(user => {
+                if (!user) {
+                    window.location.href = 'admin-login.html';
+                    return;
+                }
+                currentUser = user;
+                firebaseReady = true;
+                loadVendorData();
+                console.log('✅ Firebase ready');
+            });
+        } catch (error) {
+            console.error('Firebase init error:', error);
+            firebaseReady = false;
+        }
+        return true;
     }
     
     firebaseRetries++;
     if (firebaseRetries < maxRetries) {
-        console.log(`⏳ Waiting for Firebase (attempt ${firebaseRetries}/${maxRetries})...`);
-        setTimeout(checkAndInitializeFirebase, 500);
+        console.log(`⏳ Waiting for Firebase (${firebaseRetries}/${maxRetries})...`);
+        setTimeout(initializeFirebase, 250);
     } else {
-        console.error('❌ Firebase failed to load after 15 seconds');
-        document.body.innerHTML = `
-            <div style="padding: 40px; text-align: center; color: #dc2626; font-family: Arial;">
-                <p>❌ Erreur: Firebase ne s'est pas chargé</p>
-                <p>Veuillez rafraîchir la page</p>
-                <button onclick="location.reload()" style="padding: 10px 20px; background: #dc2626; color: white; border: none; cursor: pointer; border-radius: 4px;">Rafraîchir</button>
-            </div>
-        `;
+        console.warn('⚠️ Firebase CDN timeout, using offline mode');
+        firebaseReady = false;
+        loadVendorData();
     }
+    return false;
 }
 
-// Start checking for Firebase as soon as script is loaded
-checkAndInitializeFirebase();
+function loadVendorData() {
+    document.getElementById('vendorShopName').textContent = 'Ma Boutique DiamanoSN';
+    document.getElementById('productCount').textContent = '0';
+    document.getElementById('orderCount').textContent = '0';
+    document.getElementById('earningsValue').textContent = '0 FCFA';
+    document.getElementById('commissionStatus').textContent = '0% (30 j gratuits)';
+}
 
-function initializeApp() {
-    try {
-        const app = firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        let currentUser = null;
-        let vendorData = null;
-
-        auth.onAuthStateChanged(user => {
-            if (!user) {
-                window.location.href = 'admin-login.html';
-                return;
-            }
-            currentUser = user;
-            loadVendorData();
-        });
-
-        // Expose functions to global scope for onclick handlers
-        window.switchSection = switchSection;
-        window.openAddProductModal = openAddProductModal;
-        window.closeProductModal = closeProductModal;
-        window.saveProduct = saveProduct;
-        window.logout = logout;
-
-        async function loadVendorData() {
-            // Temporary - load basic data
-            document.getElementById('vendorShopName').textContent = 'Ma Boutique DiamanoSN';
-            document.getElementById('productCount').textContent = '0';
-            document.getElementById('orderCount').textContent = '0';
-            document.getElementById('earningsValue').textContent = '0 FCFA';
-            document.getElementById('commissionStatus').textContent = '0% (30 j gratuits)';
-        }
-
-        function switchSection(section) {
-            // Hide all sections
-            document.getElementById('overviewSection').style.display = 'none';
-            document.getElementById('productsSection').style.display = 'none';
-            document.getElementById('ordersSection').style.display = 'none';
-            document.getElementById('earningsSection').style.display = 'none';
-            document.getElementById('settingsSection').style.display = 'none';
-
-            // Show selected section
-            document.getElementById(section + 'Section').style.display = 'block';
-
-            // Update sidebar
-            document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
-            event.target.closest('.sidebar-item').classList.add('active');
-        }
-
-        function openAddProductModal() {
-            document.getElementById('productModal').classList.add('open');
-        }
-
-        function closeProductModal() {
-            document.getElementById('productModal').classList.remove('open');
-            document.getElementById('productName').value = '';
-            document.getElementById('productDescription').value = '';
-            document.getElementById('productPrice').value = '';
-            document.getElementById('productStock').value = '';
-        }
-
-        function saveProduct() {
-            alert('💾 Fonctionnalité à implémenter - Ajouter produit à votre boutique');
-            closeProductModal();
-        }
-
-        function logout() {
-            auth.signOut().then(() => {
-                window.location.href = 'index.html';
-            });
-        }
-    } catch (error) {
-        console.error('❌ Firebase initialization error:', error);
+// Start initialization when script loads
+setTimeout(initializeFirebase, 100);
         document.body.innerHTML = `
             <div style="padding: 40px; text-align: center; color: #dc2626;">
                 <p>❌ Erreur d'initialisation Firebase: ${error.message}</p>

@@ -492,325 +492,285 @@
     </div>
 </div>
 
-<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-app.js" defer></script>
-<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-auth.js" defer></script>
-<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-firestore.js" defer></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-app.js" async></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-auth.js" async></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-firestore.js" async></script>
 <script>
-// Polling approach to wait for Firebase
-let firebaseRetries = 0;
-const maxRetries = 30; // 30 * 500ms = 15 seconds max wait
+// Define state globally
+let currentUser = null;
+let currentFilter = 'all';
+let currentApprovalData = null;
+let allVendors = [];
+let firebaseReady = false;
 
-function checkAndInitializeFirebase() {
-    if (typeof firebase !== 'undefined') {
-        console.log('✅ Firebase loaded successfully');
-        initializeApp();
+// Define functions globally FIRST (before Firebase init)
+function filterVendors(status) {
+    currentFilter = status;
+    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+    if (event && event.target) event.target.classList.add('active');
+    renderVendors();
+}
+
+function viewVendorDetail(vendorId) {
+    const vendor = allVendors.find(v => v.id === vendorId);
+    if (!vendor) return;
+    
+    const html = `
+        <div class="modal-field">
+            <label class="modal-field-label">Référence</label>
+            <div class="modal-field-value">${vendor.vendorRef}</div>
+        </div>
+        <div class="modal-field">
+            <label class="modal-field-label">Boutique</label>
+            <div class="modal-field-value">${vendor.shopName}</div>
+        </div>
+        <div class="modal-field">
+            <label class="modal-field-label">Propriétaire</label>
+            <div class="modal-field-value">${vendor.ownerName}</div>
+        </div>
+        <div class="modal-field">
+            <label class="modal-field-label">Téléphone</label>
+            <div class="modal-field-value">${vendor.phone}</div>
+        </div>
+        <div class="modal-field">
+            <label class="modal-field-label">Email</label>
+            <div class="modal-field-value">${vendor.email || 'Non fourni'}</div>
+        </div>
+        <div class="modal-field">
+            <label class="modal-field-label">Localisation</label>
+            <div class="modal-field-value">${vendor.quartier ? vendor.quartier + ', ' : ''}${vendor.city}</div>
+        </div>
+        ${vendor.categories && vendor.categories.length > 0 ? `
+            <div class="modal-field">
+                <label class="modal-field-label">Catégories</label>
+                <div class="modal-field-value">${vendor.categories.join(', ')}</div>
+            </div>
+        ` : ''}
+        ${vendor.volume ? `
+            <div class="modal-field">
+                <label class="modal-field-label">Volume Estimé</label>
+                <div class="modal-field-value">${vendor.volume}</div>
+            </div>
+        ` : ''}
+        ${vendor.experience ? `
+            <div class="modal-field">
+                <label class="modal-field-label">Expérience</label>
+                <div class="modal-field-value">${vendor.experience}</div>
+            </div>
+        ` : ''}
+        ${vendor.description ? `
+            <div class="modal-field">
+                <label class="modal-field-label">Description</label>
+                <div class="modal-field-value">${vendor.description}</div>
+            </div>
+        ` : ''}
+        <div class="modal-field">
+            <label class="modal-field-label">Statut</label>
+            <div class="modal-field-value" style="${
+                vendor.status === 'approved' ? 'background: #dcfce7; color: #166534;' :
+                vendor.status === 'rejected' ? 'background: #fee2e2; color: #991b1b;' :
+                'background: #fef3c7; color: #92400e;'
+            }">
+                ${vendor.status === 'approved' ? '✅ Approuvé' : vendor.status === 'rejected' ? '❌ Rejeté' : '⏳ En attente'}
+            </div>
+        </div>
+        ${vendor.notes ? `
+            <div class="modal-field">
+                <label class="modal-field-label">Notes</label>
+                <div class="modal-field-value">${vendor.notes}</div>
+            </div>
+        ` : ''}
+    `;
+    document.getElementById('modalBody').innerHTML = html;
+    document.getElementById('detailModal').classList.add('open');
+}
+
+function closeDetailModal() {
+    const modal = document.getElementById('detailModal');
+    if (modal) modal.classList.remove('open');
+}
+
+function approveVendor(vendorId, shopName, isApprove) {
+    currentApprovalData = {
+        vendorId: vendorId,
+        shopName: shopName,
+        status: isApprove ? 'approved' : 'rejected'
+    };
+    document.getElementById('approvalTitle').textContent = isApprove 
+        ? `✅ Approuver "${shopName}"?` 
+        : `❌ Rejeter "${shopName}"?`;
+    document.getElementById('approvalNotes').value = '';
+    document.getElementById('confirmBtn').textContent = isApprove ? '✅ Approuver' : '❌ Rejeter';
+    document.getElementById('approvalModal').classList.add('open');
+}
+
+function closeApprovalModal() {
+    document.getElementById('approvalModal').classList.remove('open');
+    currentApprovalData = null;
+}
+
+async function confirmApproval() {
+    if (!currentApprovalData || !firebaseReady) {
+        showToast('❌ Firebase non prêt', 'error');
         return;
     }
-    
+    const notes = document.getElementById('approvalNotes').value;
+    const btn = document.getElementById('confirmBtn');
+    btn.disabled = true;
+    try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`https://diamonobackend.onrender.com/api/admin/vendors/${currentApprovalData.vendorId}`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                status: currentApprovalData.status,
+                notes: notes
+            })
+        });
+        if (!response.ok) throw new Error('Failed to update vendor');
+        showToast(
+            currentApprovalData.status === 'approved' 
+                ? '✅ Candidature approuvée!' 
+                : '❌ Candidature rejetée!',
+            'success'
+        );
+        closeApprovalModal();
+        loadVendors();
+    } catch (error) {
+        console.error('Error updating vendor:', error);
+        showToast('❌ Erreur lors de la mise à jour', 'error');
+        btn.disabled = false;
+    }
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// Firebase config
+const firebaseConfig = {
+    apiKey: "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
+    authDomain: "diamanosn-ea0a1.firebaseapp.com",
+    projectId: "diamanosn-ea0a1",
+    storageBucket: "diamanosn-ea0a1.firebasestorage.app",
+    messagingSenderId: "480059418031",
+    appId: "1:480059418031:web:bb071481468f52202e3b5a"
+};
+
+// Initialize Firebase
+let firebaseRetries = 0;
+const maxRetries = 40;
+
+function initializeFirebase() {
+    if (typeof firebase !== 'undefined' && firebase.apps.length === 0) {
+        console.log('✅ Firebase loaded, initializing...');
+        try {
+            const app = firebase.initializeApp(firebaseConfig);
+            const auth = firebase.auth();
+            auth.onAuthStateChanged(user => {
+                if (!user) {
+                    window.location.href = 'admin-login.html';
+                    return;
+                }
+                currentUser = user;
+                firebaseReady = true;
+                loadVendors();
+                console.log('✅ Firebase ready');
+            });
+        } catch (error) {
+            console.error('Firebase init error:', error);
+        }
+        return true;
+    }
     firebaseRetries++;
     if (firebaseRetries < maxRetries) {
-        console.log(`⏳ Waiting for Firebase (attempt ${firebaseRetries}/${maxRetries})...`);
-        setTimeout(checkAndInitializeFirebase, 500);
+        console.log(`⏳ Waiting for Firebase (${firebaseRetries}/${maxRetries})...`);
+        setTimeout(initializeFirebase, 250);
     } else {
-        console.error('❌ Firebase failed to load after 15 seconds');
-        document.getElementById('vendorsContainer').innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">❌</div>
-                <p>Erreur: Firebase ne s'est pas chargé</p>
-                <button onclick="location.reload()" style="padding: 10px 20px; background: #dc2626; color: white; border: none; cursor: pointer; border-radius: 4px; margin-top: 10px;">Rafraîchir</button>
-            </div>
-        `;
+        console.warn('⚠️ Firebase CDN timeout, redirecting to login');
+        window.location.href = 'admin-login.html';
     }
+    return false;
 }
 
-// Start checking for Firebase as soon as script is loaded
-checkAndInitializeFirebase();
-
-function initializeApp() {
-    // Firebase Config
-    const firebaseConfig = {
-        apiKey: "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
-        authDomain: "diamanosn-ea0a1.firebaseapp.com",
-        projectId: "diamanosn-ea0a1",
-        storageBucket: "diamanosn-ea0a1.firebasestorage.app",
-        messagingSenderId: "480059418031",
-        appId: "1:480059418031:web:bb071481468f52202e3b5a"
-    };
-
+async function loadVendors() {
     try {
-        const app = firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        let currentUser = null;
-        let currentFilter = 'all';
-        let currentApprovalData = null;
-        let allVendors = [];
-
-        // Check authentication
-        auth.onAuthStateChanged(user => {
-            if (!user) {
-                window.location.href = 'admin-login.html';
-                return;
+        if (!firebaseReady || !currentUser) return;
+        const token = await currentUser.getIdToken();
+        const response = await fetch('https://diamonobackend.onrender.com/api/admin/vendors', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             }
-            currentUser = user;
-            loadVendors();
         });
-
-        window.filterVendors = filterVendors;
-        window.viewVendorDetail = viewVendorDetail;
-        window.closeDetailModal = closeDetailModal;
-        window.approveVendor = approveVendor;
-        window.closeApprovalModal = closeApprovalModal;
-        window.confirmApproval = confirmApproval;
-        window.showToast = showToast;
-
-        async function loadVendors() {
-            try {
-                const token = await currentUser.getIdToken();
-                const response = await fetch('https://diamonobackend.onrender.com/api/admin/vendors', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to load vendors');
-                }
-
-                const data = await response.json();
-                allVendors = data.vendors || [];
-                renderVendors();
-            } catch (error) {
-                console.error('Error loading vendors:', error);
-                showToast('❌ Erreur lors du chargement', 'error');
-            }
-        }
-
-        function renderVendors() {
-            let filtered = allVendors;
-            if (currentFilter !== 'all') {
-                filtered = allVendors.filter(v => v.status === currentFilter);
-            }
-
-            if (filtered.length === 0) {
-                document.getElementById('vendorsContainer').innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📭</div>
-                        <p>Aucune candidature ${currentFilter === 'all' ? '' : 'dans ce statut'}</p>
-                    </div>
-                `;
-                return;
-            }
-
-            const html = filtered.map(vendor => `
-                <div class="vendor-card">
-                    <div class="vendor-header-card">
-                        <span class="vendor-ref">${vendor.vendorRef}</span>
-                        <span class="vendor-status ${vendor.status}">${
-                            vendor.status === 'pending' ? '⏳ En attente' :
-                            vendor.status === 'approved' ? '✅ Approuvé' : '❌ Rejeté'
-                        }</span>
-                    </div>
-                    
-                    <div class="vendor-name">${vendor.shopName}</div>
-                    <div class="vendor-shop">👤 ${vendor.ownerName}</div>
-                    
-                    <div class="vendor-info">
-                        <span class="vendor-info-icon">📞</span> ${vendor.phone}
-                    </div>
-                    <div class="vendor-info">
-                        <span class="vendor-info-icon">📍</span> ${vendor.quartier ? vendor.quartier + ', ' : ''}${vendor.city}
-                    </div>
-                    
-                    ${vendor.categories && vendor.categories.length > 0 ? `
-                        <div class="vendor-categories">
-                            ${vendor.categories.map(cat => `<span class="vendor-category">${cat}</span>`).join('')}
-                        </div>
-                    ` : ''}
-                    
-                    ${vendor.description ? `<div class="vendor-description">${vendor.description}</div>` : ''}
-                    
-                    <div class="vendor-actions">
-                        <button class="vendor-btn view" onclick="viewVendorDetail('${vendor.id}')">📋 Détails</button>
-                        ${vendor.status === 'pending' ? `
-                            <button class="vendor-btn approve" onclick="approveVendor('${vendor.id}', '${vendor.shopName}', true)">✅ Approuver</button>
-                            <button class="vendor-btn reject" onclick="approveVendor('${vendor.id}', '${vendor.shopName}', false)">❌ Rejeter</button>
-                        ` : ''}
-                    </div>
-                </div>
-            `).join('');
-
-            document.getElementById('vendorsContainer').innerHTML = `<div class="vendors-grid">${html}</div>`;
-        }
-
-        function filterVendors(status) {
-            currentFilter = status;
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-            renderVendors();
-        }
-
-        function viewVendorDetail(vendorId) {
-            const vendor = allVendors.find(v => v.id === vendorId);
-            if (!vendor) return;
-
-            const html = `
-                <div class="modal-field">
-                    <label class="modal-field-label">Référence</label>
-                    <div class="modal-field-value">${vendor.vendorRef}</div>
-                </div>
-                <div class="modal-field">
-                    <label class="modal-field-label">Boutique</label>
-                    <div class="modal-field-value">${vendor.shopName}</div>
-                </div>
-                <div class="modal-field">
-                    <label class="modal-field-label">Propriétaire</label>
-                    <div class="modal-field-value">${vendor.ownerName}</div>
-                </div>
-                <div class="modal-field">
-                    <label class="modal-field-label">Téléphone</label>
-                    <div class="modal-field-value">${vendor.phone}</div>
-                </div>
-                <div class="modal-field">
-                    <label class="modal-field-label">Email</label>
-                    <div class="modal-field-value">${vendor.email || 'Non fourni'}</div>
-                </div>
-                <div class="modal-field">
-                    <label class="modal-field-label">Localisation</label>
-                    <div class="modal-field-value">${vendor.quartier ? vendor.quartier + ', ' : ''}${vendor.city}</div>
-                </div>
-                ${vendor.categories && vendor.categories.length > 0 ? `
-                    <div class="modal-field">
-                        <label class="modal-field-label">Catégories</label>
-                        <div class="modal-field-value">${vendor.categories.join(', ')}</div>
-                    </div>
-                ` : ''}
-                ${vendor.volume ? `
-                    <div class="modal-field">
-                        <label class="modal-field-label">Volume Estimé</label>
-                        <div class="modal-field-value">${vendor.volume}</div>
-                    </div>
-                ` : ''}
-                ${vendor.experience ? `
-                    <div class="modal-field">
-                        <label class="modal-field-label">Expérience</label>
-                        <div class="modal-field-value">${vendor.experience}</div>
-                    </div>
-                ` : ''}
-                ${vendor.description ? `
-                    <div class="modal-field">
-                        <label class="modal-field-label">Description</label>
-                        <div class="modal-field-value">${vendor.description}</div>
-                    </div>
-                ` : ''}
-                <div class="modal-field">
-                    <label class="modal-field-label">Statut</label>
-                    <div class="modal-field-value" style="${
-                        vendor.status === 'approved' ? 'background: #dcfce7; color: #166534;' :
-                        vendor.status === 'rejected' ? 'background: #fee2e2; color: #991b1b;' :
-                        'background: #fef3c7; color: #92400e;'
-                    }">
-                        ${vendor.status === 'approved' ? '✅ Approuvé' : vendor.status === 'rejected' ? '❌ Rejeté' : '⏳ En attente'}
-                    </div>
-                </div>
-                ${vendor.notes ? `
-                    <div class="modal-field">
-                        <label class="modal-field-label">Notes</label>
-                        <div class="modal-field-value">${vendor.notes}</div>
-                    </div>
-                ` : ''}
-            `;
-
-            document.getElementById('modalBody').innerHTML = html;
-            document.getElementById('detailModal').classList.add('open');
-        }
-
-        function closeDetailModal() {
-            document.getElementById('detailModal').classList.remove('open');
-        }
-
-        function approveVendor(vendorId, shopName, isApprove) {
-            currentApprovalData = {
-                vendorId: vendorId,
-                shopName: shopName,
-                status: isApprove ? 'approved' : 'rejected'
-            };
-
-            document.getElementById('approvalTitle').textContent = isApprove 
-                ? `✅ Approuver "${shopName}"?` 
-                : `❌ Rejeter "${shopName}"?`;
-            
-            document.getElementById('approvalNotes').value = '';
-            document.getElementById('confirmBtn').textContent = isApprove ? '✅ Approuver' : '❌ Rejeter';
-            document.getElementById('approvalModal').classList.add('open');
-        }
-
-        function closeApprovalModal() {
-            document.getElementById('approvalModal').classList.remove('open');
-            currentApprovalData = null;
-        }
-
-        async function confirmApproval() {
-            if (!currentApprovalData) return;
-
-            const notes = document.getElementById('approvalNotes').value;
-            const btn = document.getElementById('confirmBtn');
-            btn.disabled = true;
-
-            try {
-                const token = await currentUser.getIdToken();
-                const response = await fetch(`https://diamonobackend.onrender.com/api/admin/vendors/${currentApprovalData.vendorId}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        status: currentApprovalData.status,
-                        notes: notes
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to update vendor');
-                }
-
-                showToast(
-                    currentApprovalData.status === 'approved' 
-                        ? '✅ Candidature approuvée!' 
-                        : '❌ Candidature rejetée!',
-                    'success'
-                );
-
-                closeApprovalModal();
-                loadVendors();
-            } catch (error) {
-                console.error('Error updating vendor:', error);
-                showToast('❌ Erreur lors de la mise à jour', 'error');
-                btn.disabled = false;
-            }
-        }
-
-        function showToast(message, type = 'success') {
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
-        }
+        if (!response.ok) throw new Error('Failed to load vendors');
+        const data = await response.json();
+        allVendors = data.vendors || [];
+        renderVendors();
     } catch (error) {
-        console.error('❌ Firebase initialization error:', error);
-        document.getElementById('vendorsContainer').innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">❌</div>
-                <p>Erreur d'initialisation Firebase: ${error.message}</p>
-            </div>
-        `;
+        console.error('Error loading vendors:', error);
+        showToast('❌ Erreur lors du chargement', 'error');
     }
 }
+
+function renderVendors() {
+    let filtered = allVendors;
+    if (currentFilter !== 'all') {
+        filtered = allVendors.filter(v => v.status === currentFilter);
+    }
+    if (filtered.length === 0) {
+        document.getElementById('vendorsContainer').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">📭</div>
+                <p>Aucune candidature ${currentFilter === 'all' ? '' : 'dans ce statut'}</p>
+            </div>
+        `;
+        return;
+    }
+    const html = filtered.map(vendor => `
+        <div class="vendor-card">
+            <div class="vendor-header-card">
+                <span class="vendor-ref">${vendor.vendorRef}</span>
+                <span class="vendor-status ${vendor.status}">${
+                    vendor.status === 'pending' ? '⏳ En attente' :
+                    vendor.status === 'approved' ? '✅ Approuvé' : '❌ Rejeté'
+                }</span>
+            </div>
+            <div class="vendor-name">${vendor.shopName}</div>
+            <div class="vendor-shop">👤 ${vendor.ownerName}</div>
+            <div class="vendor-info">
+                <span class="vendor-info-icon">📞</span> ${vendor.phone}
+            </div>
+            <div class="vendor-info">
+                <span class="vendor-info-icon">📍</span> ${vendor.quartier ? vendor.quartier + ', ' : ''}${vendor.city}
+            </div>
+            ${vendor.categories && vendor.categories.length > 0 ? `
+                <div class="vendor-categories">
+                    ${vendor.categories.map(cat => `<span class="vendor-category">${cat}</span>`).join('')}
+                </div>
+            ` : ''}
+            ${vendor.description ? `<div class="vendor-description">${vendor.description}</div>` : ''}
+            <div class="vendor-actions">
+                <button class="vendor-btn view" onclick="viewVendorDetail('${vendor.id}')">📋 Détails</button>
+                ${vendor.status === 'pending' ? `
+                    <button class="vendor-btn approve" onclick="approveVendor('${vendor.id}', '${vendor.shopName}', true)">✅ Approuver</button>
+                    <button class="vendor-btn reject" onclick="approveVendor('${vendor.id}', '${vendor.shopName}', false)">❌ Rejeter</button>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+    document.getElementById('vendorsContainer').innerHTML = `<div class="vendors-grid">${html}</div>`;
+}
+
+setTimeout(initializeFirebase, 100);
 
 </body>
 </html>
