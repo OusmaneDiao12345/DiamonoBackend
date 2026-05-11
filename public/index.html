@@ -4532,7 +4532,7 @@ async function subscribeNewsletter() {
   const email = emailInput.value.trim();
 
   if (!email || !email.includes('@')) {
-    showToast('❌ Veuillez entrer une adresse email valide', 'error');
+    toast('❌ Veuillez entrer une adresse email valide');
     return;
   }
 
@@ -4556,13 +4556,13 @@ async function subscribeNewsletter() {
 
     if (data.success) {
       emailInput.value = '';
-      showToast('✅ Merci pour votre abonnement! 🎁', 'success');
+      toast('✅ Merci pour votre abonnement! 🎁');
     } else {
-      showToast('❌ ' + (data.error || 'Erreur lors de l\'abonnement'), 'error');
+      toast('❌ ' + (data.error || 'Erreur lors de l\'abonnement'));
     }
   } catch (error) {
     console.error('Newsletter subscribe error:', error);
-    showToast('❌ Erreur réseau. Réessayez plus tard.', 'error');
+    toast('❌ Erreur réseau. Réessayez plus tard.');
   } finally {
     btn.disabled = false;
     btn.textContent = originalText;
@@ -6428,7 +6428,7 @@ function subscribeNewsletterNew() {
   const email = emailInput.value.trim();
 
   if (!email || !email.includes('@')) {
-    showToast('❌ Veuillez entrer une adresse email valide', 'error');
+    toast('❌ Veuillez entrer une adresse email valide');
     return;
   }
 
@@ -6450,14 +6450,14 @@ function subscribeNewsletterNew() {
   .then(data => {
     if (data.success) {
       emailInput.value = '';
-      showToast('✅ Merci pour votre abonnement! 🎁', 'success');
+      toast('✅ Merci pour votre abonnement! 🎁');
     } else {
-      showToast('❌ ' + (data.error || 'Erreur lors de l\'abonnement'), 'error');
+      toast('❌ ' + (data.error || 'Erreur lors de l\'abonnement'));
     }
   })
   .catch(err => {
     console.error('Newsletter subscribe error:', err);
-    showToast('❌ Erreur réseau. Réessayez plus tard.', 'error');
+    toast('❌ Erreur réseau. Réessayez plus tard.');
   })
   .finally(() => {
     btn.disabled = false;
