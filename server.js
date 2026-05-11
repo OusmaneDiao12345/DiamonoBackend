@@ -147,17 +147,20 @@ async function sendEmail(to, subject, htmlContent) {
 // ==========================================
 async function subscribeToNewsletter(email, firstName = '', lastName = '') {
     try {
-        if (!process.env.BREVO_API_KEY) {
+        if (!BREVO_API_KEY) {
             console.warn('⚠️  BREVO_API_KEY non configuré - newsletter désactivée');
             return false;
         }
 
+        console.log('📬 Abonnement newsletter:', email);
+
         const brevoAPI = axios.create({
             baseURL: 'https://api.brevo.com/v3',
             headers: {
-                'api-key': process.env.BREVO_API_KEY,
+                'api-key': BREVO_API_KEY,
                 'Content-Type': 'application/json'
-            }
+            },
+            timeout: 10000
         });
 
         // Ajouter/mettre à jour le contact dans Brevo
@@ -168,18 +171,21 @@ async function subscribeToNewsletter(email, firstName = '', lastName = '') {
                 LASTNAME: lastName || 'DiamanoSN',
                 SOURCE: 'Website Newsletter'
             },
-            listIds: [process.env.BREVO_LIST_ID || 1], // ID de la liste par défaut
+            listIds: [2], // ID liste Brevo DiamanoSN
             updateEnabled: true
         });
 
-        console.log('✅ Contact ajouté à la newsletter Brevo:', email);
+        console.log('✅ Contact ajouté à la newsletter Brevo:', email, 'ID:', response.data.id);
         return true;
     } catch (error) {
         if (error.response?.status === 400 && error.response?.data?.message?.includes('already exists')) {
-            console.log('ℹ️  Email déjà abonné:', email);
+            console.log('ℹ️  Email déjà abonné Brevo:', email);
             return true; // Pas d'erreur si déjà existant
         }
-        console.error('❌ Erreur ajout newsletter:', error.response?.data || error.message);
+        console.error('❌ Erreur ajout newsletter Brevo:');
+        console.error('  Status:', error.response?.status);
+        console.error('  Message:', error.response?.data?.message || error.message);
+        console.error('  Details:', error.response?.data);
         return false;
     }
 }
@@ -1532,10 +1538,13 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
             </div>
         `;
 
-        // Envoyer confirmation au subscriber EN ARRIÈRE-PLAN
-        sendEmail(email.trim().toLowerCase(), '✅ Bienvenue à la Newsletter DiamanoSN!', subscriberConfirmEmail).catch(err => {
-            console.error('⚠️  Email confirmation subscriber non envoyé:', err.message);
-        });
+        // Envoyer confirmation au subscriber
+        const confirmResult = await sendEmail(email.trim().toLowerCase(), '✅ Bienvenue à la Newsletter DiamanoSN!', subscriberConfirmEmail);
+        if (confirmResult.success) {
+            console.log('✅ Email confirmation subscriber envoyé:', email);
+        } else {
+            console.error('❌ Email confirmation subscriber échoué:', confirmResult.error);
+        }
 
         // 📧 NOTIFIER L'ADMIN D'UN NOUVEAU SUBSCRIBER
         const adminNewsletterEmail = `
@@ -1554,9 +1563,12 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
             </div>
         `;
 
-        sendEmail(ADMIN_EMAIL, `📬 Nouveau Subscriber Newsletter: ${email.trim().toLowerCase()}`, adminNewsletterEmail).catch(err => {
-            console.error('⚠️  Email admin newsletter non envoyé:', err.message);
-        });
+        const adminResult = await sendEmail(ADMIN_EMAIL, `📬 Nouveau Subscriber Newsletter: ${email.trim().toLowerCase()}`, adminNewsletterEmail);
+        if (adminResult.success) {
+            console.log('✅ Email admin newsletter envoyé');
+        } else {
+            console.error('❌ Email admin newsletter échoué:', adminResult.error);
+        }
 
         res.json({
             success: true,
