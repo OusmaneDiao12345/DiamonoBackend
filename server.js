@@ -62,26 +62,16 @@ if (!hasSenePayCredentials()) {
 }
 
 // ==========================================
-// 📧 CONFIGURATION EMAIL (BREVO - SMTP)
+// 📧 CONFIGURATION EMAIL (BREVO - API REST)
 // ==========================================
 const ADMIN_EMAIL = 'ousmoneebah12@gmail.com';
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
-// Configuration pour Brevo (ou Gmail alternative)
+// Configuration Gmail comme fallback
 let emailTransporter;
 
-if (process.env.EMAIL_SERVICE === 'brevo' && process.env.BREVO_API_KEY) {
-    // Configuration BREVO
-    emailTransporter = nodemailer.createTransport({
-        host: 'smtp-relay.brevo.com',
-        port: 587,
-        secure: false,
-        auth: {
-            user: 'postmaster@diamanosn.sn',
-            pass: process.env.BREVO_API_KEY
-        }
-    });
-    console.log('✅ Email sender (Brevo) initialized');
-} else if (process.env.GMAIL_USER && process.env.GMAIL_PASSWORD) {
+if (process.env.GMAIL_USER && process.env.GMAIL_PASSWORD) {
     // Configuration GMAIL (fallback)
     emailTransporter = nodemailer.createTransport({
         service: 'gmail',
@@ -92,15 +82,35 @@ if (process.env.EMAIL_SERVICE === 'brevo' && process.env.BREVO_API_KEY) {
     });
     console.log('✅ Email sender (Gmail) initialized');
 } else {
-    console.warn('⚠️  Email non configuré: ajoutez BREVO_API_KEY ou GMAIL_USER/GMAIL_PASSWORD dans .env');
+    console.warn('⚠️  Gmail non configuré: ajoutez GMAIL_USER/GMAIL_PASSWORD dans .env');
 }
 
-// Fonction pour envoyer des emails
+// Fonction pour envoyer des emails via Brevo API (préférence) ou Gmail SMTP
 async function sendEmail(to, subject, htmlContent) {
     try {
+        // PRÉFÉRENCE 1: Brevo REST API (plus fiable sur cloud servers)
+        if (BREVO_API_KEY) {
+            console.log('📧 Envoi via Brevo API REST à:', to);
+            const response = await axios.post(BREVO_API_URL, {
+                sender: { email: ADMIN_EMAIL, name: 'DiamanoSN' },
+                to: [{ email: to }],
+                subject: subject,
+                htmlContent: htmlContent
+            }, {
+                headers: {
+                    'api-key': BREVO_API_KEY,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 10000
+            });
+            console.log('✅ Email envoyé via Brevo API:', response.data.messageId);
+            return { success: true, messageId: response.data.messageId, service: 'brevo-api' };
+        }
+        
+        // FALLBACK 2: Gmail SMTP
         if (!emailTransporter) {
-            console.error('❌ Email transporter non configuré');
-            return { success: false, error: 'Email transporter non configuré' };
+            console.error('❌ Aucun service email configuré (ni Brevo API ni Gmail)');
+            return { success: false, error: 'Aucun service email configuré' };
         }
 
         const mailOptions = {
@@ -110,24 +120,23 @@ async function sendEmail(to, subject, htmlContent) {
             html: htmlContent
         };
         
-        console.log('📧 Tentative envoi email à:', to, 'via', process.env.EMAIL_SERVICE || 'Gmail');
+        console.log('📧 Envoi via Gmail SMTP à:', to);
         const info = await emailTransporter.sendMail(mailOptions);
-        console.log('✅ Email envoyé avec succès:', info.response);
-        return { success: true, messageId: info.messageId };
+        console.log('✅ Email envoyé via Gmail:', info.response);
+        return { success: true, messageId: info.messageId, service: 'gmail-smtp' };
     } catch (error) {
-        console.error('❌ Erreur DÉTAILLÉE envoi email:');
+        console.error('❌ Erreur envoi email:');
+        console.error('  Service: Brevo/Gmail');
         console.error('  Message:', error.message);
         console.error('  Code:', error.code);
-        console.error('  Response:', error.response);
-        console.error('  Command:', error.command);
-        console.error('  Stack:', error.stack);
+        console.error('  Status:', error.response?.status);
         return { 
             success: false, 
             error: error.message,
             details: {
                 code: error.code,
-                command: error.command,
-                response: error.response?.toString() || 'N/A'
+                status: error.response?.status,
+                statusText: error.response?.statusText
             }
         };
     }
@@ -262,10 +271,9 @@ app.get('/api/config/firebase', (req, res) => {
 app.get('/api/test-email', async (req, res) => {
     try {
         console.log('🧪 TEST EMAIL - Configuration:');
-        console.log('  EMAIL_SERVICE:', process.env.EMAIL_SERVICE);
+        console.log('  BREVO_API_KEY:', BREVO_API_KEY ? '✅ SET (length: ' + BREVO_API_KEY.length + ')' : '❌ NOT SET');
         console.log('  GMAIL_USER:', process.env.GMAIL_USER ? '✅ SET' : '❌ NOT SET');
-        console.log('  BREVO_API_KEY:', process.env.BREVO_API_KEY ? '✅ SET (length: ' + process.env.BREVO_API_KEY.length + ')' : '❌ NOT SET');
-        console.log('  emailTransporter:', emailTransporter ? '✅ READY' : '❌ NOT READY');
+        console.log('  emailTransporter (Gmail):', emailTransporter ? '✅ READY' : '❌ NOT READY');
 
         const testEmail = `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #0d9488; border-radius: 8px; padding: 20px; background: #f0fdf4;">
@@ -275,9 +283,8 @@ app.get('/api/test-email', async (req, res) => {
                 <div style="background: white; padding: 15px; border-radius: 6px; margin: 20px 0;">
                     <p><strong>Configuration Email Status:</strong></p>
                     <ul style="list-style: none; padding: 0;">
+                        <li>${BREVO_API_KEY ? '✅' : '❌'} Brevo API: ${BREVO_API_KEY ? 'Configuré' : 'Non configuré'}</li>
                         <li>${process.env.GMAIL_USER ? '✅' : '❌'} Gmail: ${process.env.GMAIL_USER || 'Non configuré'}</li>
-                        <li>${process.env.EMAIL_SERVICE === 'brevo' ? '✅' : '❌'} Brevo: ${process.env.EMAIL_SERVICE === 'brevo' ? 'Activé' : 'Non activé'}</li>
-                        <li>${emailTransporter ? '✅' : '❌'} Email Transporter: ${emailTransporter ? 'OK' : 'FAILED'}</li>
                     </ul>
                 </div>
 
@@ -302,10 +309,10 @@ app.get('/api/test-email', async (req, res) => {
                 success: true,
                 message: 'Email test envoyé avec succès!',
                 messageId: result.messageId,
+                service: result.service,
                 emailConfig: {
-                    hasGmail: !!process.env.GMAIL_USER,
-                    hasBrevo: process.env.EMAIL_SERVICE === 'brevo',
-                    transporterStatus: 'OK',
+                    brevoApi: !!BREVO_API_KEY,
+                    gmail: !!process.env.GMAIL_USER,
                     adminEmail: ADMIN_EMAIL
                 }
             });
@@ -316,9 +323,8 @@ app.get('/api/test-email', async (req, res) => {
                 error: result.error,
                 errorDetails: result.details,
                 emailConfig: {
-                    hasGmail: !!process.env.GMAIL_USER,
-                    hasBrevo: process.env.EMAIL_SERVICE === 'brevo',
-                    transporterStatus: emailTransporter ? 'OK' : 'FAILED',
+                    brevoApi: !!BREVO_API_KEY,
+                    gmail: !!process.env.GMAIL_USER,
                     adminEmail: ADMIN_EMAIL
                 }
             });
