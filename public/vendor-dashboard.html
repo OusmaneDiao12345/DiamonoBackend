@@ -620,39 +620,55 @@ const firebaseConfig = {
     appId: "1:480059418031:web:bb071481468f52202e3b5a"
 };
 
-// Dynamically load Firebase SDK with single bundle
+// Dynamically load Firebase SDK with local fallback
 function loadFirebaseSDK() {
-    console.log('📦 Loading Firebase SDK from jsDelivr...');
+    console.log('📦 Loading Firebase SDK...');
     
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/firebase@10.7.0/dist/firebase.min.js';
-    script.type = 'text/javascript';
-    script.async = true;
+    const cdns = [
+        'https://cdn.jsdelivr.net/npm/firebase@10.7.0/dist/firebase.min.js',
+        'https://unpkg.com/firebase@10.7.0/dist/firebase.min.js',
+        '/firebase-stub.js'  // Local fallback
+    ];
     
-    script.onload = () => {
-        console.log('✅ Firebase SDK loaded!');
-        clearTimeout(firebaseTimeout);
-        setTimeout(initializeFirebase, 100);
-    };
+    let cdnIndex = 0;
     
-    script.onerror = () => {
-        console.error('❌ Failed to load Firebase SDK');
-        firebaseRetry();
-    };
+    function tryLoad() {
+        if (cdnIndex >= cdns.length) {
+            console.error('❌ All sources failed');
+            showFirebaseError();
+            return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = cdns[cdnIndex];
+        script.type = 'text/javascript';
+        script.async = true;
+        
+        script.onload = () => {
+            console.log(`✅ Firebase loaded from: ${cdns[cdnIndex]}`);
+            clearTimeout(firebaseTimeout);
+            setTimeout(initializeFirebase, 100);
+        };
+        
+        script.onerror = () => {
+            console.warn(`⚠️ Failed: ${cdns[cdnIndex]}`);
+            cdnIndex++;
+            tryLoad();
+        };
+        
+        document.head.appendChild(script);
+    }
     
-    document.head.appendChild(script);
-    
-    // Timeout after 20 seconds
+    // Try first CDN with timeout
     firebaseTimeout = setTimeout(() => {
-        console.error('❌ Firebase CDN failed to load after 20 seconds');
-        showFirebaseError();
-    }, 20000);
-}
-
-function firebaseRetry() {
-    console.log('🔄 Retrying Firebase load...');
-    clearTimeout(firebaseTimeout);
-    setTimeout(loadFirebaseSDK, 2000);
+        console.error('❌ Timeout on: ' + cdns[cdnIndex]);
+        if (typeof firebase === 'undefined') {
+            cdnIndex++;
+            tryLoad();
+        }
+    }, 10000);
+    
+    tryLoad();
 }
 
 function showFirebaseError() {
@@ -660,7 +676,7 @@ function showFirebaseError() {
     if (header) {
         const msg = document.createElement('div');
         msg.style.cssText = 'background: #dc2626; color: white; padding: 15px; text-align: center; margin-bottom: 20px;';
-        msg.innerHTML = '❌ Erreur Firebase - Essayez de rafraîchir';
+        msg.innerHTML = '❌ Erreur Firebase - Mode hors ligne';
         header.after(msg);
     }
 }

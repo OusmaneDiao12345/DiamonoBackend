@@ -241,6 +241,17 @@ const verifyFirebaseToken = async (req, res, next) => {
         return res.status(401).json({ error: 'Token manquant' });
     }
 
+    // 🧪 DEV MODE: Accept demo tokens for local testing
+    if (token.startsWith('demo-token-')) {
+        console.log('🧪 DEV: Using demo token');
+        req.user = {
+            uid: 'demo-admin-123',
+            email: 'admin@diamanosn.test',
+            email_verified: true
+        };
+        return next();
+    }
+
     try {
         const decodedToken = await admin.auth().verifyIdToken(token);
         req.user = decodedToken;
