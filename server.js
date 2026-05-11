@@ -353,6 +353,93 @@ app.get('/api/test-email', async (req, res) => {
  * POST /api/payments/create
  * Créer une transaction de paiement avec Senepay
  */
+app.get('/api/test-newsletter', async (req, res) => {
+    try {
+        console.log('🧪 TEST NEWSLETTER - Configuration:');
+        console.log('  BREVO_API_KEY:', BREVO_API_KEY ? '✅ SET' : '❌ NOT SET');
+        console.log('  ADMIN_EMAIL:', ADMIN_EMAIL);
+
+        const testEmail = req.query.email || 'test.newsletter@diamanosn.test';
+        const testFirstName = 'Test';
+        const testLastName = 'Newsletter';
+
+        // Étape 1: Ajouter à Brevo
+        console.log('📬 TEST 1: Ajouter contact Brevo...');
+        const brevoResult = await subscribeToNewsletter(testEmail, testFirstName, testLastName);
+        if (!brevoResult) {
+            return res.status(500).json({
+                success: false,
+                step: 'brevo-subscription',
+                message: 'Erreur lors de l\'abonnement Brevo'
+            });
+        }
+
+        // Étape 2: Envoyer email confirmation au subscriber
+        console.log('📬 TEST 2: Envoyer email confirmation...');
+        const confirmEmail = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #0d9488;">✅ Test: Email de Confirmation Newsletter</h2>
+                <p>Bienvenue ${testFirstName}!</p>
+                <p>Cet email teste le système de confirmation pour les abonnés newsletter.</p>
+                <p><strong>Email:</strong> ${testEmail}</p>
+                <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
+            </div>
+        `;
+        const confirmResult = await sendEmail(testEmail, '✅ Test: Bienvenue à la Newsletter DiamanoSN!', confirmEmail);
+        console.log('Confirmation email result:', confirmResult);
+
+        // Étape 3: Envoyer email admin
+        console.log('📬 TEST 3: Envoyer email admin...');
+        const adminEmail = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #0d9488;">📬 Test: Nouveau Subscriber Newsletter</h2>
+                <div style="background: #f0fdf4; padding: 15px; border-radius: 6px;">
+                    <p><strong>Email:</strong> ${testEmail}</p>
+                    <p><strong>Nom:</strong> ${testFirstName} ${testLastName}</p>
+                    <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
+                </div>
+            </div>
+        `;
+        const adminResult = await sendEmail(ADMIN_EMAIL, `📬 Test: Nouveau Subscriber Newsletter: ${testEmail}`, adminEmail);
+        console.log('Admin email result:', adminResult);
+
+        res.json({
+            success: true,
+            message: 'Test newsletter complété',
+            results: {
+                brevoSubscription: { success: brevoResult },
+                confirmationEmail: { 
+                    success: confirmResult.success, 
+                    messageId: confirmResult.messageId,
+                    service: confirmResult.service,
+                    error: confirmResult.error
+                },
+                adminEmail: { 
+                    success: adminResult.success, 
+                    messageId: adminResult.messageId,
+                    service: adminResult.service,
+                    error: adminResult.error
+                }
+            },
+            emails: {
+                confirmationSentTo: testEmail,
+                adminNotificationSentTo: ADMIN_EMAIL
+            }
+        });
+    } catch (error) {
+        console.error('🧪 TEST NEWSLETTER EXCEPTION:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
+
+/**
+ * POST /api/payments/create
+ * Créer une transaction de paiement avec Senepay
+ */
 app.post('/api/payments/create', verifyFirebaseToken, async (req, res) => {
     if (!hasSenePayCredentials()) {
         return res.status(503).json({ error: 'Senepay non configuré' });
