@@ -1451,6 +1451,49 @@ footer{background:var(--dark);color:#fff;padding:48px 0 0;margin-top:40px;}
   display:flex;justify-content:space-between;
   font-size:13px;color:var(--muted);margin-bottom:6px;
 }
+
+/* Promo Code Section */
+.promo-section{
+  background:linear-gradient(135deg, #fff5e6 0%, #fffbf0 100%);
+  border:2px solid #fcd34d;border-radius:10px;
+  padding:12px;margin-bottom:12px;
+}
+.promo-input-group{
+  display:flex;gap:6px;margin-bottom:8px;
+}
+.promo-input{
+  flex:1;
+  border:1px solid var(--gray3);border-radius:6px;
+  padding:8px 10px;
+  font-size:12px;background:#fff;
+  transition:var(--transition);
+}
+.promo-input:focus{
+  outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(13,148,136,0.1);
+}
+.promo-apply-btn{
+  padding:8px 14px;
+  background:var(--green);color:#fff;border:none;border-radius:6px;
+  font-size:11px;font-weight:700;cursor:pointer;
+  transition:var(--transition);white-space:nowrap;
+}
+.promo-apply-btn:hover{
+  background:var(--green2);transform:translateY(-1px);
+}
+.promo-apply-btn:active{transform:scale(0.95);}
+.promo-message{
+  font-size:11px;margin-bottom:6px;padding:6px 8px;border-radius:4px;
+  text-align:center;font-weight:600;
+}
+.promo-message.error{background:#fee2e2;color:#991b1b;}
+.promo-message.success{background:#d1fae5;color:#065f46;}
+.promo-discount{
+  display:flex;justify-content:space-between;
+  font-size:12px;color:var(--green);
+  font-weight:700;padding-top:6px;border-top:1px solid #fcd34d;
+}
+
+.cs-row{
 .cs-row strong{color:var(--dark);font-weight:700;}
 .cs-divider{border:none;border-top:1px dashed var(--gray3);margin:8px 0;}
 .cs-commission{
@@ -3413,6 +3456,27 @@ footer{background:var(--dark);color:#fff;padding:48px 0 0;margin-top:40px;}
 
     <!-- Résumé commande -->
     <div class="cart-summary">
+      <!-- Code Promo -->
+      <div class="promo-section">
+        <div class="promo-input-group">
+          <input 
+            type="text" 
+            id="promoCode" 
+            placeholder="Code promo (ex: DIAMANO15)" 
+            class="promo-input"
+            onkeyup="if(event.key==='Enter') applyPromoCode()"
+          >
+          <button class="promo-apply-btn" onclick="applyPromoCode()">
+            <span id="promoApplyText">Appliquer</span>
+          </button>
+        </div>
+        <div id="promoMessage" style="display:none;" class="promo-message"></div>
+        <div id="promoDiscount" style="display:none;" class="promo-discount">
+          <span>Réduction appliquée</span>
+          <strong id="promoDDiscountAmount">-0 FCFA</strong>
+        </div>
+      </div>
+
       <div class="cs-row"><span>Sous-total</span><strong id="cartSubtotal">0 FCFA</strong></div>
       <div class="cs-commission">
         <div class="label"><span class="info-icon" onclick="showCommissionInfo()">ℹ️</span> Commission plateforme (5%)</div>
@@ -5088,6 +5152,93 @@ let selectedPayment = 'livraison';
 const COMMISSION_RATE = 0.05;
 const FREE_DELIVERY_THRESHOLD = 25000;
 
+// 🎟️ Promo Code Management
+let appliedPromo = null; // { code, discount, type, value }
+
+async function applyPromoCode() {
+  const input = document.getElementById('promoCode');
+  const code = input.value.trim().toUpperCase();
+  const msgEl = document.getElementById('promoMessage');
+  const discountEl = document.getElementById('promoDiscount');
+  const btn = event.target;
+  
+  if (!code) {
+    msgEl.style.display = 'block';
+    msgEl.className = 'promo-message error';
+    msgEl.textContent = '❌ Entrez un code promo';
+    return;
+  }
+
+  // Calculate current cart subtotal
+  const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
+  
+  btn.disabled = true;
+  btn.textContent = '⏳...';
+
+  try {
+    const response = await fetch(API_URL + '/coupons/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, cartAmount: subtotal })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      // Apply promo
+      appliedPromo = {
+        code: data.couponCode,
+        discount: data.discount,
+        type: data.type,
+        value: data.value
+      };
+      
+      msgEl.style.display = 'block';
+      msgEl.className = 'promo-message success';
+      msgEl.textContent = `✅ ${data.description}`;
+      
+      document.getElementById('promoDDiscountAmount').textContent = `-${fmtPrice(data.discount)}`;
+      discountEl.style.display = 'flex';
+      
+      input.disabled = true;
+      btn.disabled = true;
+      btn.textContent = '✅ Appliqué';
+      
+      renderCartPanel(); // Recalculate totals
+      console.log('✅ Promo applied:', appliedPromo);
+    } else {
+      appliedPromo = null;
+      msgEl.style.display = 'block';
+      msgEl.className = 'promo-message error';
+      msgEl.textContent = `❌ ${data.error}`;
+      discountEl.style.display = 'none';
+      renderCartPanel();
+    }
+  } catch (error) {
+    console.error('Promo validation error:', error);
+    msgEl.style.display = 'block';
+    msgEl.className = 'promo-message error';
+    msgEl.textContent = '❌ Erreur réseau';
+    appliedPromo = null;
+    discountEl.style.display = 'none';
+    renderCartPanel();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Appliquer';
+  }
+}
+
+function clearPromoCode() {
+  appliedPromo = null;
+  document.getElementById('promoCode').value = '';
+  document.getElementById('promoCode').disabled = false;
+  document.getElementById('promoMessage').style.display = 'none';
+  document.getElementById('promoDiscount').style.display = 'none';
+  document.querySelector('.promo-apply-btn').disabled = false;
+  document.querySelector('.promo-apply-btn').textContent = 'Appliquer';
+  renderCartPanel();
+}
+
 function openAccountModal() {
   if(currentUser) {
     showUserMenu();
@@ -5548,7 +5699,8 @@ function renderCartPanel(){
   const subtotal = cart.reduce((s,c)=>s+c.price*c.qty, 0);
   const commission = Math.round(subtotal * COMMISSION_RATE);
   const livraison = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : 2000;
-  const total = subtotal + commission + livraison;
+  const discount = appliedPromo ? appliedPromo.discount : 0;
+  const total = subtotal + commission + livraison - discount;
   
   document.getElementById('cartSubtotal').textContent = fmtPrice(subtotal);
   document.getElementById('cartCommission').textContent = fmtPrice(commission);
@@ -5630,6 +5782,7 @@ function openCart(){
   document.body.style.overflow = 'hidden';
 }
 function closeCart(){ 
+  clearPromoCode();
   document.getElementById('cartOverlay').classList.remove('open'); 
   document.getElementById('cartPanel').classList.remove('open'); 
   document.body.style.overflow = '';
@@ -5783,7 +5936,9 @@ async function _saveOrderToServer(ref, addr, total, subtotal, commission) {
         customerName: currentUser.name,
         customerPhone: (currentUser.phone || '').replace(/[^0-9]/g, ''),
         customerEmail: currentUser.email || '',
-        orderRef: ref
+        orderRef: ref,
+        promoCode: appliedPromo ? appliedPromo.code : null,
+        discount: appliedPromo ? appliedPromo.discount : 0
       })
     });
 

@@ -436,6 +436,110 @@ app.get('/api/test-newsletter', async (req, res) => {
     }
 });
 
+// ==========================================
+// 🎟️ COUPONS / CODES PROMO
+// ==========================================
+
+/**
+ * POST /api/coupons/validate
+ * Valider et appliquer un code promo
+ */
+app.post('/api/coupons/validate', async (req, res) => {
+    try {
+        const { code, cartAmount } = req.body;
+
+        if (!code || !code.trim()) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Code promo requis' 
+            });
+        }
+
+        const couponCode = code.trim().toUpperCase();
+        console.log('🎟️ Validation coupon:', couponCode, 'montant panier:', cartAmount);
+
+        // Chercher le coupon dans Firestore
+        const couponsRef = db.collection('coupons');
+        const snapshot = await couponsRef.where('code', '==', couponCode).limit(1).get();
+
+        if (snapshot.empty) {
+            console.log('❌ Coupon introuvable:', couponCode);
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Code promo invalide ou expiré' 
+            });
+        }
+
+        const coupon = snapshot.docs[0].data();
+        const now = new Date();
+
+        // Vérifications
+        if (!coupon.active) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Ce code promo n\'est pas actif' 
+            });
+        }
+
+        if (coupon.validFrom && new Date(coupon.validFrom) > now) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Ce code promo n\'est pas encore valide' 
+            });
+        }
+
+        if (coupon.validUntil && new Date(coupon.validUntil) < now) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Ce code promo a expiré' 
+            });
+        }
+
+        if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Ce code promo a atteint sa limite d\'utilisation' 
+            });
+        }
+
+        if (coupon.minAmount && cartAmount < coupon.minAmount) {
+            return res.status(400).json({ 
+                success: false, 
+                error: `Montant minimum requis: ${coupon.minAmount} FCFA` 
+            });
+        }
+
+        // Calculer la réduction
+        let discount = 0;
+        if (coupon.type === 'percentage') {
+            discount = Math.round((cartAmount * coupon.value) / 100);
+        } else if (coupon.type === 'fixed') {
+            discount = coupon.value;
+        }
+
+        // Cap: la réduction ne peut pas dépasser le panier
+        discount = Math.min(discount, cartAmount);
+
+        console.log('✅ Coupon valide:', couponCode, 'réduction:', discount);
+
+        res.json({
+            success: true,
+            couponCode: couponCode,
+            discount: discount,
+            type: coupon.type,
+            value: coupon.value,
+            description: coupon.type === 'percentage' ? coupon.value + '%' : discount + ' FCFA'
+        });
+
+    } catch (error) {
+        console.error('❌ Erreur validation coupon:', error.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Erreur lors de la validation du code promo' 
+        });
+    }
+});
+
 /**
  * POST /api/payments/create
  * Créer une transaction de paiement avec Senepay
