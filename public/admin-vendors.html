@@ -492,9 +492,9 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/firebase@10.7.0/app"></script>
-<script src="https://cdn.jsdelivr.net/npm/firebase@10.7.0/auth"></script>
-<script src="https://cdn.jsdelivr.net/npm/firebase@10.7.0/firestore"></script>
+<script async defer src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-app.js"></script>
+<script async defer src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-auth.js"></script>
+<script async defer src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-firestore.js"></script>
 <script>
 // Define state globally
 let currentUser = null;
@@ -502,6 +502,51 @@ let currentFilter = 'all';
 let currentApprovalData = null;
 let allVendors = [];
 let firebaseReady = false;
+
+// Firebase config
+const firebaseConfig = {
+    apiKey: "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
+    authDomain: "diamanosn-ea0a1.firebaseapp.com",
+    projectId: "diamanosn-ea0a1",
+    storageBucket: "diamanosn-ea0a1.firebasestorage.app",
+    messagingSenderId: "480059418031",
+    appId: "1:480059418031:web:bb071481468f52202e3b5a"
+};
+
+// Wait for ALL script loads to complete
+let firebaseCheckInterval = null;
+
+function checkFirebaseAndInit() {
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length === 0) {
+        console.log('✅ Firebase SDK loaded, initializing...');
+        clearInterval(firebaseCheckInterval);
+        initializeFirebase();
+        return;
+    }
+    
+    if (typeof firebase === 'undefined') {
+        console.log('⏳ Waiting for Firebase SDK...');
+    }
+}
+
+// Start checking immediately and every 100ms
+firebaseCheckInterval = setInterval(checkFirebaseAndInit, 100);
+
+// Timeout after 20 seconds
+setTimeout(() => {
+    if (firebaseCheckInterval) {
+        clearInterval(firebaseCheckInterval);
+        console.error('❌ Firebase CDN failed to load after 20 seconds');
+        document.getElementById('vendorsContainer').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">❌</div>
+                <p>Erreur: Firebase CDN inaccessible</p>
+                <p style="font-size: 12px; color: #64748b;">Essayez de rafraîchir la page</p>
+                <button onclick="location.reload()" style="padding: 10px 20px; background: #dc2626; color: white; border: none; cursor: pointer; border-radius: 4px; margin-top: 10px;">Rafraîchir</button>
+            </div>
+        `;
+    }
+}, 20000);
 
 // Define functions globally FIRST (before Firebase init)
 function filterVendors(status) {
@@ -654,59 +699,32 @@ function showToast(message, type = 'success') {
     setTimeout(() => toast.remove(), 3000);
 }
 
-// Firebase config
-const firebaseConfig = {
-    apiKey: "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
-    authDomain: "diamanosn-ea0a1.firebaseapp.com",
-    projectId: "diamanosn-ea0a1",
-    storageBucket: "diamanosn-ea0a1.firebasestorage.app",
-    messagingSenderId: "480059418031",
-    appId: "1:480059418031:web:bb071481468f52202e3b5a"
-};
-
-// Initialize Firebase
-let firebaseRetries = 0;
-const maxRetries = 40;
-
 function initializeFirebase() {
-    if (typeof firebase !== 'undefined' && firebase.apps.length === 0) {
-        console.log('✅ Firebase loaded, initializing...');
-        try {
-            const app = firebase.initializeApp(firebaseConfig);
-            const auth = firebase.auth();
-            console.log('🔐 Setting up auth listener...');
-            auth.onAuthStateChanged(user => {
-                if (!user) {
-                    console.warn('⚠️ User not authenticated, redirecting to login');
-                    window.location.href = 'admin-login.html';
-                    return;
-                }
-                console.log('👤 User authenticated:', user.email, 'UID:', user.uid);
-                currentUser = user;
-                firebaseReady = true;
-                console.log('✅ Firebase ready, loading vendors...');
-                loadVendors();
-            });
-        } catch (error) {
-            console.error('🔴 Firebase init error:', error);
-            document.getElementById('vendorsContainer').innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">🔴</div>
-                    <p>Erreur Firebase: ${error.message}</p>
-                </div>
-            `;
-        }
-        return true;
+    try {
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        console.log('🔐 Setting up auth listener...');
+        auth.onAuthStateChanged(user => {
+            if (!user) {
+                console.warn('⚠️ User not authenticated, redirecting to login');
+                window.location.href = 'admin-login.html';
+                return;
+            }
+            console.log('👤 User authenticated:', user.email, 'UID:', user.uid);
+            currentUser = user;
+            firebaseReady = true;
+            console.log('✅ Firebase ready, loading vendors...');
+            loadVendors();
+        });
+    } catch (error) {
+        console.error('🔴 Firebase init error:', error);
+        document.getElementById('vendorsContainer').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🔴</div>
+                <p>Erreur Firebase: ${error.message}</p>
+            </div>
+        `;
     }
-    firebaseRetries++;
-    if (firebaseRetries < maxRetries) {
-        console.log(`⏳ Waiting for Firebase (${firebaseRetries}/${maxRetries})...`);
-        setTimeout(initializeFirebase, 250);
-    } else {
-        console.warn('⚠️ Firebase CDN timeout, redirecting to login');
-        window.location.href = 'admin-login.html';
-    }
-    return false;
 }
 
 async function loadVendors() {
@@ -814,8 +832,6 @@ function renderVendors() {
     `).join('');
     document.getElementById('vendorsContainer').innerHTML = `<div class="vendors-grid">${html}</div>`;
 }
-
-setTimeout(initializeFirebase, 100);
 </script>
 
 </body>
