@@ -2172,7 +2172,7 @@ app.use((req, res) => {
 // ==========================================
 // DÉMARRAGE SERVEUR
 // ==========================================
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`
 ╔═══════════════════════════════════════════════════════╗
 ║  🚀 DiamanoSN API Server (Paiements + Firebase)      ║
