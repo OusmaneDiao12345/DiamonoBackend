@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — Gestion Vendeurs | DiamanoSN</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8fafc;
+            color: #0f172a;
+            min-height: 100vh;
+        }
+
+        :root {
+            --green: #0d9488;
+            --green2: #115e59;
+            --greenl: #ccfbf1;
+            --red: #dc2626;
+            --yellow: #f59e0b;
+            --blue: #2563eb;
+            --gray: #64748b;
+            --gray2: #94a3b8;
+            --gray3: #cbd5e1;
+            --gray4: #e2e8f0;
+            --dark: #0f172a;
+            --dark2: #1e293b;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--green), var(--green2));
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 28px;
+            font-weight: 900;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 10px 18px;
+            border: 2px solid var(--gray4);
+            background: white;
+            color: var(--dark);
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-btn.active {
+            background: var(--green);
+            color: white;
+            border-color: var(--green);
+        }
+
+        .filter-btn:hover {
+            border-color: var(--green);
+        }
+
+        .vendors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .vendor-card {
+            background: white;
+            border: 1px solid var(--gray4);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            transition: all 0.2s;
+        }
+
+        .vendor-card:hover {
+            box-shadow: var(--shadow-md);
+            border-color: var(--green);
+        }
+
+        .vendor-header-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 16px;
+            gap: 12px;
+        }
+
+        .vendor-ref {
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--green);
+            background: var(--greenl);
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+
+        .vendor-status {
+            font-weight: 700;
+            font-size: 11px;
+            padding: 5px 12px;
+            border-radius: 20px;
+        }
+
+        .vendor-status.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .vendor-status.approved {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .vendor-status.rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .vendor-name {
+            font-size: 16px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .vendor-shop {
+            font-size: 14px;
+            color: var(--gray);
+            margin-bottom: 12px;
+        }
+
+        .vendor-info {
+            font-size: 13px;
+            color: var(--dark2);
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .vendor-info-icon {
+            color: var(--green);
+            font-weight: bold;
+        }
+
+        .vendor-categories {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 12px 0;
+        }
+
+        .vendor-category {
+            font-size: 11px;
+            background: var(--gray4);
+            color: var(--dark2);
+            padding: 3px 9px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .vendor-description {
+            font-size: 12px;
+            color: var(--gray);
+            line-height: 1.4;
+            margin: 12px 0;
+            max-height: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .vendor-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--gray4);
+        }
+
+        .vendor-btn {
+            flex: 1;
+            padding: 10px 14px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .vendor-btn.approve {
+            background: var(--green);
+            color: white;
+        }
+
+        .vendor-btn.approve:hover {
+            background: var(--green2);
+        }
+
+        .vendor-btn.reject {
+            background: var(--red);
+            color: white;
+        }
+
+        .vendor-btn.reject:hover {
+            background: #b91c1c;
+        }
+
+        .vendor-btn.view {
+            background: var(--blue);
+            color: white;
+        }
+
+        .vendor-btn.view:hover {
+            background: #1d4ed8;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--gray);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--gray4);
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--gray);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 5000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.open {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .modal-field {
+            margin-bottom: 16px;
+        }
+
+        .modal-field-label {
+            font-weight: 700;
+            font-size: 12px;
+            color: var(--dark2);
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .modal-field-value {
+            font-size: 14px;
+            color: var(--dark);
+            background: var(--gray5);
+            padding: 10px 14px;
+            border-radius: 8px;
+        }
+
+        .modal-textarea {
+            width: 100%;
+            border: 2px solid var(--gray4);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            resize: vertical;
+            min-height: 80px;
+            color: var(--dark);
+        }
+
+        .modal-textarea:focus {
+            outline: none;
+            border-color: var(--green);
+            background: white;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .modal-btn.cancel {
+            background: var(--gray4);
+            color: var(--dark);
+        }
+
+        .modal-btn.confirm {
+            background: var(--green);
+            color: white;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--dark);
+            color: white;
+            padding: 14px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            z-index: 6000;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast.success {
+            background: var(--green);
+        }
+
+        .toast.error {
+            background: var(--red);
+        }
+
+        @media (max-width: 768px) {
+            .vendors-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-bar {
+                overflow-x: auto;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- HEADER -->
+    <div class="header">
+        <h1>🏪 Gestion des Vendeurs</h1>
+        <p>Approuvez ou rejetez les candidatures de vendeurs pour DiamanoSN</p>
+    </div>
+
+    <!-- FILTER BAR -->
+    <div class="filter-bar">
+        <button class="filter-btn active" onclick="filterVendors('all')">Toutes (</button>
+        <button class="filter-btn" onclick="filterVendors('pending')">⏳ En attente</button>
+        <button class="filter-btn" onclick="filterVendors('approved')">✅ Approuvés</button>
+        <button class="filter-btn" onclick="filterVendors('rejected')">❌ Rejetés</button>
+    </div>
+
+    <!-- VENDORS GRID -->
+    <div id="vendorsContainer">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 16px;">Chargement des candidatures...</p>
+        </div>
+    </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal" id="detailModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span>📋 Détails de la Candidature</span>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+        <div class="modal-footer">
+            <button class="modal-btn cancel" onclick="closeDetailModal()">Fermer</button>
+        </div>
+    </div>
+</div>
+
+<!-- APPROVAL MODAL -->
+<div class="modal" id="approvalModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span id="approvalTitle">✅ Approuver cette candidature?</span>
+        </div>
+        <div class="modal-body">
+            <div class="modal-field">
+                <label class="modal-field-label">Notes (optionnel)</label>
+                <textarea class="modal-textarea" id="approvalNotes" placeholder="Ajoutez des notes pour le vendeur..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn cancel" onclick="closeApprovalModal()">Annuler</button>
+            <button class="modal-btn confirm" id="confirmBtn" onclick="confirmApproval()">Confirmer</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-firestore.js"></script>
+<script>
+// Firebase Config
+const firebaseConfig = {
+    apiKey: "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
+    authDomain: "diamanosn-ea0a1.firebaseapp.com",
+    projectId: "diamanosn-ea0a1",
+    storageBucket: "diamanosn-ea0a1.firebasestorage.app",
+    messagingSenderId: "480059418031",
+    appId: "1:480059418031:web:bb071481468f52202e3b5a"
+};
+
+const app = firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let currentUser = null;
+let currentFilter = 'all';
+let currentApprovalData = null;
+let allVendors = [];
+
+// Check authentication
+auth.onAuthStateChanged(user => {
+    if (!user) {
+        window.location.href = 'admin-login.html';
+        return;
+    }
+    currentUser = user;
+    loadVendors();
+});
+
+async function loadVendors() {
+    try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch('https://diamonobackend.onrender.com/api/admin/vendors', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load vendors');
+        }
+
+        const data = await response.json();
+        allVendors = data.vendors || [];
+        renderVendors();
+    } catch (error) {
+        console.error('Error loading vendors:', error);
+        showToast('❌ Erreur lors du chargement', 'error');
+    }
+}
+
+function renderVendors() {
+    let filtered = allVendors;
+    if (currentFilter !== 'all') {
+        filtered = allVendors.filter(v => v.status === currentFilter);
+    }
+
+    if (filtered.length === 0) {
+        document.getElementById('vendorsContainer').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">📭</div>
+                <p>Aucune candidature ${currentFilter === 'all' ? '' : 'dans ce statut'}</p>
+            </div>
+        `;
+        return;
+    }
+
+    const html = filtered.map(vendor => `
+        <div class="vendor-card">
+            <div class="vendor-header-card">
+                <span class="vendor-ref">${vendor.vendorRef}</span>
+                <span class="vendor-status ${vendor.status}">${
+                    vendor.status === 'pending' ? '⏳ En attente' :
+                    vendor.status === 'approved' ? '✅ Approuvé' : '❌ Rejeté'
+                }</span>
+            </div>
+            
+            <div class="vendor-name">${vendor.shopName}</div>
+            <div class="vendor-shop">👤 ${vendor.ownerName}</div>
+            
+            <div class="vendor-info">
+                <span class="vendor-info-icon">📞</span> ${vendor.phone}
+            </div>
+            <div class="vendor-info">
+                <span class="vendor-info-icon">📍</span> ${vendor.quartier ? vendor.quartier + ', ' : ''}${vendor.city}
+            </div>
+            
+            ${vendor.categories && vendor.categories.length > 0 ? `
+                <div class="vendor-categories">
+                    ${vendor.categories.map(cat => `<span class="vendor-category">${cat}</span>`).join('')}
+                </div>
+            ` : ''}
+            
+            ${vendor.description ? `<div class="vendor-description">${vendor.description}</div>` : ''}
+            
+            <div class="vendor-actions">
+                <button class="vendor-btn view" onclick="viewVendorDetail('${vendor.id}')">📋 Détails</button>
+                ${vendor.status === 'pending' ? `
+                    <button class="vendor-btn approve" onclick="approveVendor('${vendor.id}', '${vendor.shopName}', true)">✅ Approuver</button>
+                    <button class="vendor-btn reject" onclick="approveVendor('${vendor.id}', '${vendor.shopName}', false)">❌ Rejeter</button>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+
+    document.getElementById('vendorsContainer').innerHTML = `<div class="vendors-grid">${html}</div>`;
+}
+
+function filterVendors(status) {
+    currentFilter = status;
+    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    renderVendors();
+}
+
+function viewVendorDetail(vendorId) {
+    const vendor = allVendors.find(v => v.id === vendorId);
+    if (!vendor) return;
+
+    const html = `
+        <div class="modal-field">
+            <label class="modal-field-label">Référence</label>
+            <div class="modal-field-value">${vendor.vendorRef}</div>
+        </div>
+        <div class="modal-field">
+            <label class="modal-field-label">Boutique</label>
+            <div class="modal-field-value">${vendor.shopName}</div>
+        </div>
+        <div class="modal-field">
+            <label class="modal-field-label">Propriétaire</label>
+            <div class="modal-field-value">${vendor.ownerName}</div>
+        </div>
+        <div class="modal-field">
+            <label class="modal-field-label">Téléphone</label>
+            <div class="modal-field-value">${vendor.phone}</div>
+        </div>
+        <div class="modal-field">
+            <label class="modal-field-label">Email</label>
+            <div class="modal-field-value">${vendor.email || 'Non fourni'}</div>
+        </div>
+        <div class="modal-field">
+            <label class="modal-field-label">Localisation</label>
+            <div class="modal-field-value">${vendor.quartier ? vendor.quartier + ', ' : ''}${vendor.city}</div>
+        </div>
+        ${vendor.categories && vendor.categories.length > 0 ? `
+            <div class="modal-field">
+                <label class="modal-field-label">Catégories</label>
+                <div class="modal-field-value">${vendor.categories.join(', ')}</div>
+            </div>
+        ` : ''}
+        ${vendor.volume ? `
+            <div class="modal-field">
+                <label class="modal-field-label">Volume Estimé</label>
+                <div class="modal-field-value">${vendor.volume}</div>
+            </div>
+        ` : ''}
+        ${vendor.experience ? `
+            <div class="modal-field">
+                <label class="modal-field-label">Expérience</label>
+                <div class="modal-field-value">${vendor.experience}</div>
+            </div>
+        ` : ''}
+        ${vendor.description ? `
+            <div class="modal-field">
+                <label class="modal-field-label">Description</label>
+                <div class="modal-field-value">${vendor.description}</div>
+            </div>
+        ` : ''}
+        <div class="modal-field">
+            <label class="modal-field-label">Statut</label>
+            <div class="modal-field-value" style="${
+                vendor.status === 'approved' ? 'background: #dcfce7; color: #166534;' :
+                vendor.status === 'rejected' ? 'background: #fee2e2; color: #991b1b;' :
+                'background: #fef3c7; color: #92400e;'
+            }">
+                ${vendor.status === 'approved' ? '✅ Approuvé' : vendor.status === 'rejected' ? '❌ Rejeté' : '⏳ En attente'}
+            </div>
+        </div>
+        ${vendor.notes ? `
+            <div class="modal-field">
+                <label class="modal-field-label">Notes</label>
+                <div class="modal-field-value">${vendor.notes}</div>
+            </div>
+        ` : ''}
+    `;
+
+    document.getElementById('modalBody').innerHTML = html;
+    document.getElementById('detailModal').classList.add('open');
+}
+
+function closeDetailModal() {
+    document.getElementById('detailModal').classList.remove('open');
+}
+
+function approveVendor(vendorId, shopName, isApprove) {
+    currentApprovalData = {
+        vendorId: vendorId,
+        shopName: shopName,
+        status: isApprove ? 'approved' : 'rejected'
+    };
+
+    document.getElementById('approvalTitle').textContent = isApprove 
+        ? `✅ Approuver "${shopName}"?` 
+        : `❌ Rejeter "${shopName}"?`;
+    
+    document.getElementById('approvalNotes').value = '';
+    document.getElementById('confirmBtn').textContent = isApprove ? '✅ Approuver' : '❌ Rejeter';
+    document.getElementById('approvalModal').classList.add('open');
+}
+
+function closeApprovalModal() {
+    document.getElementById('approvalModal').classList.remove('open');
+    currentApprovalData = null;
+}
+
+async function confirmApproval() {
+    if (!currentApprovalData) return;
+
+    const notes = document.getElementById('approvalNotes').value;
+    const btn = document.getElementById('confirmBtn');
+    btn.disabled = true;
+
+    try {
+        const token = await currentUser.getIdToken();
+        const response = await fetch(`https://diamonobackend.onrender.com/api/admin/vendors/${currentApprovalData.vendorId}`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                status: currentApprovalData.status,
+                notes: notes
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to update vendor');
+        }
+
+        showToast(
+            currentApprovalData.status === 'approved' 
+                ? '✅ Candidature approuvée!' 
+                : '❌ Candidature rejetée!',
+            'success'
+        );
+
+        closeApprovalModal();
+        loadVendors();
+    } catch (error) {
+        console.error('Error updating vendor:', error);
+        showToast('❌ Erreur lors de la mise à jour', 'error');
+        btn.disabled = false;
+    }
+}
+
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+</script>
+
+</body>
+</html>

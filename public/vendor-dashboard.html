@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Vendeur | DiamanoSN</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8fafc;
+            color: #0f172a;
+            min-height: 100vh;
+        }
+
+        :root {
+            --green: #0d9488;
+            --green2: #115e59;
+            --greenl: #ccfbf1;
+            --red: #dc2626;
+            --yellow: #f59e0b;
+            --blue: #2563eb;
+            --gray: #64748b;
+            --gray2: #94a3b8;
+            --gray3: #cbd5e1;
+            --gray4: #e2e8f0;
+            --dark: #0f172a;
+            --dark2: #1e293b;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 250px;
+            height: 100vh;
+            background: linear-gradient(135deg, var(--green), var(--green2));
+            color: white;
+            padding: 20px;
+            box-shadow: var(--shadow-md);
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .sidebar-logo {
+            font-family: 'Outfit', sans-serif;
+            font-size: 18px;
+            font-weight: 900;
+            margin-bottom: 30px;
+        }
+
+        .sidebar-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .sidebar-item {
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .sidebar-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-item.active {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .main {
+            margin-left: 250px;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--green), var(--green2));
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+        }
+
+        .header-left h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 28px;
+            font-weight: 900;
+            margin-bottom: 8px;
+        }
+
+        .header-left p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .header-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .header-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid var(--gray4);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--gray);
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 900;
+            font-family: 'Outfit', sans-serif;
+            color: var(--green);
+        }
+
+        .section {
+            background: white;
+            border: 1px solid var(--gray4);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow);
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 16px;
+        }
+
+        .product-card {
+            background: var(--gray5);
+            border: 1px solid var(--gray4);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .product-image {
+            width: 100%;
+            height: 150px;
+            background: var(--gray3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+
+        .product-info {
+            padding: 12px;
+        }
+
+        .product-name {
+            font-weight: 700;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .product-price {
+            color: var(--green);
+            font-weight: 800;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .product-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .product-btn {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid var(--gray4);
+            border-radius: 4px;
+            background: white;
+            color: var(--dark);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .product-btn:hover {
+            background: var(--gray5);
+        }
+
+        .btn-primary {
+            background: var(--green);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-primary:hover {
+            background: var(--green2);
+        }
+
+        .no-products {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--gray);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge.approved {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--gray);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--gray4);
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 5000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.open {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 700;
+            font-size: 12px;
+            color: var(--dark2);
+            margin-bottom: 6px;
+        }
+
+        .form-input, .form-textarea {
+            width: 100%;
+            border: 2px solid var(--gray4);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            color: var(--dark);
+        }
+
+        .form-input:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--green);
+            background: white;
+        }
+
+        .form-textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 200px;
+            }
+
+            .main {
+                margin-left: 200px;
+                padding: 12px;
+            }
+
+            .header {
+                flex-direction: column;
+            }
+
+            .products-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+
+            .main {
+                margin-left: 0;
+                padding: 12px;
+            }
+
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+    <div class="sidebar-logo">🏪 DiamanoSN</div>
+    <div class="sidebar-menu">
+        <a href="#" class="sidebar-item active" onclick="switchSection('overview')">
+            <span>📊</span> Aperçu
+        </a>
+        <a href="#" class="sidebar-item" onclick="switchSection('products')">
+            <span>📦</span> Mes Produits
+        </a>
+        <a href="#" class="sidebar-item" onclick="switchSection('orders')">
+            <span>🛒</span> Commandes
+        </a>
+        <a href="#" class="sidebar-item" onclick="switchSection('earnings')">
+            <span>💰</span> Gains
+        </a>
+        <a href="#" class="sidebar-item" onclick="switchSection('settings')">
+            <span>⚙️</span> Paramètres
+        </a>
+        <hr style="margin: 16px 0; opacity: 0.2;">
+        <a href="#" class="sidebar-item" onclick="logout()">
+            <span>🚪</span> Déconnecter
+        </a>
+    </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-left">
+            <h1>Welcome to Your Store</h1>
+            <p id="vendorShopName">Ma boutique</p>
+        </div>
+        <button class="header-btn" onclick="openAddProductModal()">➕ Ajouter un produit</button>
+    </div>
+
+    <!-- OVERVIEW SECTION -->
+    <div id="overviewSection">
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-label">Produits Listés</div>
+                <div class="stat-value" id="productCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Commandes</div>
+                <div class="stat-value" id="orderCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Gains (FCFA)</div>
+                <div class="stat-value" id="earningsValue">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Statut Commission</div>
+                <div class="stat-value" id="commissionStatus" style="font-size: 14px; color: var(--green);">0%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PRODUCTS SECTION -->
+    <div id="productsSection" style="display: none;">
+        <div class="section">
+            <div class="section-title">
+                <span>📦</span> Mes Produits
+                <button class="btn-primary" style="margin-left: auto;" onclick="openAddProductModal()">➕ Ajouter</button>
+            </div>
+            <div id="productsContainer" class="products-grid">
+                <div class="no-products">
+                    <p>Vous n'avez pas encore ajouté de produits</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ORDERS SECTION -->
+    <div id="ordersSection" style="display: none;">
+        <div class="section">
+            <div class="section-title">
+                <span>🛒</span> Dernières Commandes
+            </div>
+            <div id="ordersContainer">
+                <p>Vous n'avez pas encore reçu de commandes</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- EARNINGS SECTION -->
+    <div id="earningsSection" style="display: none;">
+        <div class="section">
+            <div class="section-title">
+                <span>💰</span> Mes Gains
+            </div>
+            <div style="background: var(--greenl); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="font-size: 13px; color: var(--green2); margin-bottom: 8px;">💎 Revenu Total</p>
+                <div style="font-size: 32px; font-weight: 900; color: var(--green);">0 FCFA</div>
+                <p style="font-size: 12px; color: var(--gray); margin-top: 8px;">Commission actuelle: 0% (30 premiers jours gratuits!)</p>
+            </div>
+            <div id="earningsHistory">
+                <p>Aucune vente enregistrée</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS SECTION -->
+    <div id="settingsSection" style="display: none;">
+        <div class="section">
+            <div class="section-title">
+                <span>⚙️</span> Paramètres de la Boutique
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nom de la Boutique</label>
+                <input type="text" class="form-input" id="settingsShopName" disabled>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Propriétaire</label>
+                <input type="text" class="form-input" id="settingsOwnerName" disabled>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Téléphone</label>
+                <input type="text" class="form-input" id="settingsPhone" disabled>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" class="form-input" id="settingsEmail" disabled>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <textarea class="form-textarea" id="settingsDescription" disabled></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ADD PRODUCT MODAL -->
+<div class="modal" id="productModal">
+    <div class="modal-content">
+        <div class="modal-header">➕ Ajouter un Produit</div>
+        <div class="form-group">
+            <label class="form-label">Nom du Produit</label>
+            <input type="text" class="form-input" id="productName" placeholder="Ex: T-shirt DiamanoSN">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea class="form-textarea" id="productDescription" placeholder="Décrivez votre produit..."></textarea>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Prix (FCFA)</label>
+            <input type="number" class="form-input" id="productPrice" placeholder="5000">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Stock</label>
+            <input type="number" class="form-input" id="productStock" placeholder="10">
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn-primary" style="flex: 1;" onclick="closeProductModal()">Annuler</button>
+            <button class="btn-primary" style="flex: 1;" onclick="saveProduct()">✅ Ajouter</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-firestore.js"></script>
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyBbFsuwlSpWjGKYK77HP3M065KdN2PN32Y",
+    authDomain: "diamanosn-ea0a1.firebaseapp.com",
+    projectId: "diamanosn-ea0a1",
+    storageBucket: "diamanosn-ea0a1.firebasestorage.app",
+    messagingSenderId: "480059418031",
+    appId: "1:480059418031:web:bb071481468f52202e3b5a"
+};
+
+const app = firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let currentUser = null;
+let vendorData = null;
+
+auth.onAuthStateChanged(user => {
+    if (!user) {
+        window.location.href = 'admin-login.html';
+        return;
+    }
+    currentUser = user;
+    loadVendorData();
+});
+
+async function loadVendorData() {
+    // Temporary - load basic data
+    document.getElementById('vendorShopName').textContent = 'Ma Boutique DiamanoSN';
+    document.getElementById('productCount').textContent = '0';
+    document.getElementById('orderCount').textContent = '0';
+    document.getElementById('earningsValue').textContent = '0 FCFA';
+    document.getElementById('commissionStatus').textContent = '0% (30 j gratuits)';
+}
+
+function switchSection(section) {
+    // Hide all sections
+    document.getElementById('overviewSection').style.display = 'none';
+    document.getElementById('productsSection').style.display = 'none';
+    document.getElementById('ordersSection').style.display = 'none';
+    document.getElementById('earningsSection').style.display = 'none';
+    document.getElementById('settingsSection').style.display = 'none';
+
+    // Show selected section
+    document.getElementById(section + 'Section').style.display = 'block';
+
+    // Update sidebar
+    document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+    event.target.closest('.sidebar-item').classList.add('active');
+}
+
+function openAddProductModal() {
+    document.getElementById('productModal').classList.add('open');
+}
+
+function closeProductModal() {
+    document.getElementById('productModal').classList.remove('open');
+    document.getElementById('productName').value = '';
+    document.getElementById('productDescription').value = '';
+    document.getElementById('productPrice').value = '';
+    document.getElementById('productStock').value = '';
+}
+
+function saveProduct() {
+    alert('💾 Fonctionnalité à implémenter - Ajouter produit à votre boutique');
+    closeProductModal();
+}
+
+function logout() {
+    auth.signOut().then(() => {
+        window.location.href = 'index.html';
+    });
+}
+</script>
+
+</body>
+</html>

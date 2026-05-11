@@ -1776,12 +1776,386 @@ app.post('/api/newsletter/subscribe', async (req, res) => {
 });
 
 // ==========================================
+// � VENDORS / DEVENEZ VENDEUR ROUTES
+// ==========================================
+
+/**
+ * POST /api/vendors/apply
+ * Enregistrer une candidature de vendeur
+ */
+app.post('/api/vendors/apply', async (req, res) => {
+    try {
+        const {
+            shopName,
+            ownerName,
+            phone,
+            email,
+            city,
+            quartier,
+            description,
+            categories,
+            volume,
+            experience
+        } = req.body;
+
+        // Validations
+        if (!shopName || !ownerName || !phone || !city) {
+            return res.status(400).json({
+                success: false,
+                error: 'Données de candidature incomplètes'
+            });
+        }
+
+        // Créer l'ID de référence unique
+        const vendorRef = 'VND-' + Date.now().toString().slice(-6);
+
+        // Sauvegarder la candidature dans Firestore
+        const vendorData = {
+            vendorRef: vendorRef,
+            shopName: shopName.trim(),
+            ownerName: ownerName.trim(),
+            phone: phone.trim(),
+            email: email?.trim() || '',
+            city: city.trim(),
+            quartier: quartier?.trim() || '',
+            description: description?.trim() || '',
+            categories: Array.isArray(categories) ? categories : [],
+            volume: volume || '',
+            experience: experience || '',
+            status: 'pending', // pending, approved, rejected
+            commission: 0, // 0% for first 30 days, then 5%
+            commissionFreeUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // +30 days
+            submittedAt: new Date().toISOString(),
+            approvedAt: null,
+            approvedBy: null,
+            notes: '',
+            productsCount: 0,
+            ordersCount: 0,
+            totalEarnings: 0
+        };
+
+        const vendorRef_db = await db.collection('vendors').add(vendorData);
+
+        console.log('✅ Candidature vendeur reçue:', vendorRef, 'ID:', vendorRef_db.id);
+
+        // ===== EMAIL À L'ADMIN =====
+        const adminVendorEmail = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+                <h2 style="color: #0d9488; text-align: center;">🏪 Nouvelle Candidature Vendeur!</h2>
+                
+                <div style="background: #f0fdf4; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                    <p><strong>Référence:</strong> ${vendorRef}</p>
+                    <p><strong>Boutique:</strong> ${shopName}</p>
+                    <p><strong>Propriétaire:</strong> ${ownerName}</p>
+                    <p><strong>Téléphone:</strong> ${phone}</p>
+                    <p><strong>Email:</strong> ${email || 'Non fourni'}</p>
+                    <p><strong>Localisation:</strong> ${quartier ? quartier + ', ' : ''}${city}</p>
+                </div>
+
+                <h3 style="color: #0d9488;">📋 Détails:</h3>
+                <ul style="background: #f8fafc; padding: 15px; border-radius: 6px;">
+                    <li><strong>Catégories:</strong> ${categories.join(', ') || 'Non spécifiées'}</li>
+                    <li><strong>Volume/mois:</strong> ${volume || 'Non précisé'}</li>
+                    <li><strong>Expérience:</strong> ${experience || 'Non renseigné'}</li>
+                    <li><strong>Description:</strong> ${description || 'Aucune'}</li>
+                </ul>
+
+                <div style="margin-top: 20px; padding: 15px; background: #fef3c7; border-radius: 6px; border-left: 4px solid #f59e0b;">
+                    <p style="margin: 0;"><strong>⚠️ Action requise:</strong></p>
+                    <p style="margin: 8px 0;">Veuillez approuver ou rejeter cette candidature dans le panel admin.</p>
+                </div>
+
+                <p style="color: #666; text-align: center; margin-top: 30px; font-size: 12px;">
+                    DiamanoSN © 2026 - Système de Recrutement Vendeurs
+                </p>
+            </div>
+        `;
+
+        // ===== EMAIL AU CANDIDAT VENDEUR =====
+        const vendorConfirmEmail = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h2 style="color: #0d9488; margin: 0;">✅ Candidature Reçue!</h2>
+                    <p style="color: #666; margin-top: 5px;">Bienvenue chez DiamanoSN</p>
+                </div>
+
+                <div style="background: #f0fdf4; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                    <p style="margin: 8px 0;"><strong>🏪 Boutique:</strong> ${shopName}</p>
+                    <p style="margin: 8px 0;"><strong>👤 Propriétaire:</strong> ${ownerName}</p>
+                    <p style="margin: 8px 0;"><strong>📞 Référence:</strong> ${vendorRef}</p>
+                </div>
+
+                <h3 style="color: #0d9488;">📋 Prochaines Étapes:</h3>
+                <div class="step" style="margin: 15px 0; padding: 12px; background: #f8fafc; border-left: 4px solid #0d9488;">
+                    <p style="margin: 0;"><strong>1️⃣ Validation (Immédiate)</strong></p>
+                    <p style="margin: 5px 0; color: #666; font-size: 13px;">Nous vérifions votre candidature automatiquement.</p>
+                </div>
+
+                <div class="step" style="margin: 15px 0; padding: 12px; background: #f8fafc; border-left: 4px solid #0d9488;">
+                    <p style="margin: 0;"><strong>2️⃣ Appel de confirmation (Sous 24h)</strong></p>
+                    <p style="margin: 5px 0; color: #666; font-size: 13px;">Notre équipe vous appellera au ${phone} pour valider votre identité.</p>
+                </div>
+
+                <div class="step" style="margin: 15px 0; padding: 12px; background: #f8fafc; border-left: 4px solid #0d9488;">
+                    <p style="margin: 0;"><strong>3️⃣ Activation du compte</strong></p>
+                    <p style="margin: 5px 0; color: #666; font-size: 13px;">Accès à votre dashboard pour ajouter produits et suivre ventes.</p>
+                </div>
+
+                <div class="step" style="margin: 15px 0; padding: 12px; background: #f0fdf4; border-left: 4px solid #10b981;">
+                    <p style="margin: 0;"><strong>🎁 Offre de Lancement (Gratuit!)</strong></p>
+                    <p style="margin: 5px 0; color: #0d9488; font-size: 13px;"><strong>Commission 0%</strong> pendant vos 30 premiers jours + Badge "Vendeur Certifié"</p>
+                </div>
+
+                <div style="background: #eff6ff; padding: 15px; border-radius: 6px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+                    <p style="margin: 0;"><strong>📞 Questions?</strong></p>
+                    <p style="margin: 8px 0;">WhatsApp: <a href="https://wa.me/221773632458" style="color: #0d9488; text-decoration: none;">+221 77 363 24 58</a></p>
+                    <p style="margin: 8px 0;">Référence à mentionner: <strong>${vendorRef}</strong></p>
+                </div>
+
+                <p style="color: #666; text-align: center; margin-top: 30px; font-size: 12px;">
+                    © 2026 DiamanoSN - Le Grand Bazar du Sénégal
+                </p>
+            </div>
+        `;
+
+        // Envoyer emails en arrière-plan
+        if (email) {
+            sendEmail(email.trim(), `✅ Candidature Reçue - Référence: ${vendorRef}`, vendorConfirmEmail);
+        }
+        sendEmail(ADMIN_EMAIL, `🏪 Nouvelle Candidature Vendeur: ${shopName}`, adminVendorEmail);
+
+        res.json({
+            success: true,
+            vendorRef: vendorRef,
+            message: 'Candidature envoyée avec succès!',
+            nextSteps: 'Vous recevrez un appel de confirmation sous 24h'
+        });
+    } catch (error) {
+        console.error('Vendor application error:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur lors de l\'enregistrement de la candidature'
+        });
+    }
+});
+
+/**
+ * GET /api/admin/vendors
+ * Admin: Lister toutes les candidatures de vendeur
+ */
+app.get('/api/admin/vendors', verifyFirebaseToken, async (req, res) => {
+    try {
+        const { status } = req.query; // 'pending', 'approved', 'rejected', or all
+
+        let query = db.collection('vendors');
+
+        if (status) {
+            query = query.where('status', '==', status);
+        }
+
+        const snapshot = await query.orderBy('submittedAt', 'desc').limit(100).get();
+
+        const vendors = [];
+        snapshot.forEach(doc => {
+            vendors.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+
+        res.json({
+            success: true,
+            vendors: vendors,
+            total: vendors.length,
+            filtered: status ? `Status: ${status}` : 'Toutes les candidatures'
+        });
+    } catch (error) {
+        console.error('Get vendors error:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur lors de la récupération des candidatures'
+        });
+    }
+});
+
+/**
+ * GET /api/admin/vendors/:vendorId
+ * Admin: Récupérer détails d'une candidature
+ */
+app.get('/api/admin/vendors/:vendorId', verifyFirebaseToken, async (req, res) => {
+    try {
+        const { vendorId } = req.params;
+
+        const vendorDoc = await db.collection('vendors').doc(vendorId).get();
+        if (!vendorDoc.exists) {
+            return res.status(404).json({
+                success: false,
+                error: 'Candidature non trouvée'
+            });
+        }
+
+        res.json({
+            success: true,
+            id: vendorId,
+            ...vendorDoc.data()
+        });
+    } catch (error) {
+        console.error('Get vendor details error:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur lors de la récupération des détails'
+        });
+    }
+});
+
+/**
+ * PATCH /api/admin/vendors/:vendorId
+ * Admin: Approuver ou rejeter une candidature
+ */
+app.patch('/api/admin/vendors/:vendorId', verifyFirebaseToken, async (req, res) => {
+    try {
+        const { vendorId } = req.params;
+        const { status, notes } = req.body;
+
+        if (!status || !['approved', 'rejected'].includes(status)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Statut invalide (approved ou rejected)'
+            });
+        }
+
+        const vendorDoc = await db.collection('vendors').doc(vendorId).get();
+        if (!vendorDoc.exists) {
+            return res.status(404).json({
+                success: false,
+                error: 'Candidature non trouvée'
+            });
+        }
+
+        const vendorData = vendorDoc.data();
+
+        const updateData = {
+            status: status,
+            approvedAt: status === 'approved' ? new Date().toISOString() : null,
+            approvedBy: status === 'approved' ? req.user.uid : null,
+            notes: notes || vendorData.notes,
+            updatedAt: new Date().toISOString()
+        };
+
+        await db.collection('vendors').doc(vendorId).update(updateData);
+
+        console.log('✅ Candidature', status, ':', vendorData.vendorRef);
+
+        // ===== EMAIL SELON DÉCISION =====
+        let emailSubject, emailContent;
+
+        if (status === 'approved') {
+            emailSubject = `🎉 Candidature Approuvée - ${vendorData.vendorRef}`;
+            emailContent = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h2 style="color: #10b981; margin: 0; font-size: 28px;">🎉 Félicitations!</h2>
+                        <p style="color: #666; margin-top: 10px;">Votre candidature a été approuvée!</p>
+                    </div>
+
+                    <div style="background: #f0fdf4; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                        <p style="margin: 8px 0;"><strong>🏪 Boutique:</strong> ${vendorData.shopName}</p>
+                        <p style="margin: 8px 0;"><strong>✅ Statut:</strong> Approuvé</p>
+                        <p style="margin: 8px 0;"><strong>📞 Référence:</strong> ${vendorData.vendorRef}</p>
+                    </div>
+
+                    <h3 style="color: #10b981;">🚀 Prochaines Étapes:</h3>
+                    <ol style="background: #f8fafc; padding: 15px; border-radius: 6px; line-height: 1.8;">
+                        <li><strong>Créer votre compte vendeur</strong> - Accédez à votre dashboard</li>
+                        <li><strong>Ajouter vos produits</strong> - Téléchargez photos et descriptions</li>
+                        <li><strong>Définir vos tarifs</strong> - Commissions: 0% pendant 30 jours, puis 5%</li>
+                        <li><strong>Commencer à vendre</strong> - Vos produits seront visibles à 9M+ acheteurs!</li>
+                    </ol>
+
+                    <div style="background: #10b981; color: white; padding: 15px; border-radius: 6px; margin: 20px 0; text-align: center;">
+                        <p style="margin: 0; font-size: 14px;"><strong>🎁 OFFRE DE LANCEMENT</strong></p>
+                        <p style="margin: 8px 0; font-size: 18px; font-weight: bold;">Commission 0% pendant 30 jours!</p>
+                        <p style="margin: 8px 0; font-size: 13px;">+ Badge "Vendeur Certifié"</p>
+                    </div>
+
+                    <div style="background: #eff6ff; padding: 15px; border-radius: 6px; border-left: 4px solid #3b82f6;">
+                        <p style="margin: 0;"><strong>📞 Support Dédié</strong></p>
+                        <p style="margin: 8px 0;">WhatsApp: <a href="https://wa.me/221773632458" style="color: #0d9488; text-decoration: none;">+221 77 363 24 58</a></p>
+                        <p style="margin: 8px 0;">Une équipe d'experts est là pour vous aider!</p>
+                    </div>
+
+                    <p style="color: #666; text-align: center; margin-top: 30px; font-size: 12px;">
+                        © 2026 DiamanoSN - Le Grand Bazar du Sénégal
+                    </p>
+                </div>
+            `;
+        } else {
+            emailSubject = `📋 Candidature en Attente de Réexamen - ${vendorData.vendorRef}`;
+            emailContent = `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+                    <h2 style="color: #ef4444; text-align: center;">📋 Candidature Rejetée</h2>
+                    
+                    <p>Bonjour ${vendorData.ownerName},</p>
+                    <p>Malheureusement, votre candidature n'a pas pu être approuvée à ce stade.</p>
+
+                    <div style="background: #fee2e2; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                        <p style="margin: 0;"><strong>📝 Raison:</strong></p>
+                        <p style="margin: 8px 0; color: #991b1b;">${notes || 'Informations insuffisantes ou non conformes'}</p>
+                    </div>
+
+                    <div style="background: #eff6ff; padding: 15px; border-radius: 6px; border-left: 4px solid #3b82f6;">
+                        <p style="margin: 0;"><strong>💡 Que faire?</strong></p>
+                        <p style="margin: 8px 0;">Vous pouvez réessayer avec des informations complètes ou nous contacter pour plus de détails.</p>
+                        <p style="margin: 8px 0;">WhatsApp: <a href="https://wa.me/221773632458" style="color: #0d9488; text-decoration: none;">+221 77 363 24 58</a></p>
+                    </div>
+
+                    <p style="color: #666; text-align: center; margin-top: 30px; font-size: 12px;">
+                        © 2026 DiamanoSN - Le Grand Bazar du Sénégal
+                    </p>
+                </div>
+            `;
+        }
+
+        // Envoyer l'email au vendeur
+        if (vendorData.email) {
+            sendEmail(vendorData.email, emailSubject, emailContent);
+        }
+
+        // Email admin
+        const adminUpdateEmail = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #0d9488;">Candidature Vendeur ${status === 'approved' ? '✅ Approuvée' : '❌ Rejetée'}</h2>
+                <p><strong>Boutique:</strong> ${vendorData.shopName}</p>
+                <p><strong>Propriétaire:</strong> ${vendorData.ownerName}</p>
+                <p><strong>Référence:</strong> ${vendorData.vendorRef}</p>
+                <p><strong>Statut:</strong> ${status}</p>
+                ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+            </div>
+        `;
+        sendEmail(ADMIN_EMAIL, `Candidature Vendeur ${status === 'approved' ? '✅ Approuvée' : '❌ Rejetée'}: ${vendorData.vendorRef}`, adminUpdateEmail);
+
+        res.json({
+            success: true,
+            message: `Candidature ${status === 'approved' ? 'approuvée' : 'rejetée'} et email envoyé`,
+            vendorRef: vendorData.vendorRef,
+            status: status
+        });
+    } catch (error) {
+        console.error('Update vendor status error:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur lors de la mise à jour du statut'
+        });
+    }
+});
+
+// ==========================================
 // 🏥 HEALTH CHECK
 // ==========================================
 app.get('/api/health', (req, res) => {
     res.json({
         status: 'ok',
-        version: '1.1.0-contact-api',
+        version: '1.2.0-vendors-api',
         timestamp: new Date().toISOString(),
         firebase: admin.apps.length > 0 ? 'connected' : 'disconnected',
         senepay: hasSenePayCredentials() ? 'configured' : 'not-configured'

@@ -6450,47 +6450,68 @@ async function _vSubmit() {
   const city = document.getElementById('vCity').value;
   const quartier = document.getElementById('vQuartier').value.trim();
   const desc = document.getElementById('vDesc').value.trim();
-  const cats = [...document.querySelectorAll('.vcat-chip.selected')].map(c => c.textContent.trim()).join(', ');
+  const categories = [...document.querySelectorAll('.vcat-chip.selected')].map(c => c.textContent.trim());
   const vol = document.getElementById('vVolume').value;
   const exp = document.getElementById('vExperience').value;
-  const ref = 'VND-' + Date.now().toString().slice(-6);
 
-  // Send via Formspree (same endpoint as orders)
   try {
-    await fetch('https://formspree.io/f/xkgjbgjv', {
+    // ✅ SEND TO BACKEND API (not Formspree anymore)
+    const response = await fetch('https://diamonobackend.onrender.com/api/vendors/apply', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: JSON.stringify({
-        _subject: '🏪 Nouvelle candidature vendeur — ' + shopName,
-        boutique: shopName,
-        proprietaire: ownerName,
-        telephone: phone,
-        email: email || 'Non fourni',
-        localisation: (quartier ? quartier + ', ' : '') + city,
-        description: desc || 'Pas de description',
-        categories: cats,
-        volume: vol || 'Non précisé',
-        experience: exp || 'Non précisé',
-        reference: ref,
-        date: new Date().toLocaleDateString('fr-FR', {weekday:'long',day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}),
+        shopName: shopName,
+        ownerName: ownerName,
+        phone: phone,
+        email: email,
+        city: city,
+        quartier: quartier,
+        description: desc,
+        categories: categories,
+        volume: vol,
+        experience: exp
       })
     });
-  } catch(e) {
-    console.warn('Formspree unavailable, continuing anyway:', e);
+
+    const result = await response.json();
+
+    if (!result.success) {
+      btn.disabled = false;
+      btn.textContent = 'Commencer →';
+      toast('❌ Erreur: ' + (result.error || 'Erreur lors de l\'envoi'));
+      console.error('API error:', result);
+      return;
+    }
+
+    console.log('✅ Candidature envoyée:', result.vendorRef);
+
+    btn.disabled = false;
+
+    // Show success modal
+    closeVendorModal();
+    document.getElementById('vs-name').textContent = ownerName;
+    document.getElementById('vs-shop').textContent = shopName;
+    document.getElementById('vs-ref').textContent = result.vendorRef;
+    // WhatsApp link with ref
+    const waLink = document.getElementById('vs-wa-link');
+    waLink.href = 'https://wa.me/221773632458?text=' + encodeURIComponent('Bonjour DiamanoSN, je viens de soumettre ma candidature vendeur. Boutique : ' + shopName + ' — Ref : ' + result.vendorRef);
+    document.getElementById('vendorSuccessModal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    toast('✅ Candidature envoyée! Ref: ' + result.vendorRef);
+
+  } catch(error) {
+    console.error('Submission error:', error);
+    btn.disabled = false;
+    btn.textContent = 'Commencer →';
+    toast('❌ Erreur de connexion: ' + error.message);
   }
+}
 
-  btn.disabled = false;
-
-  // Show success modal
-  closeVendorModal();
-  document.getElementById('vs-name').textContent = ownerName;
-  document.getElementById('vs-shop').textContent = shopName;
-  document.getElementById('vs-ref').textContent = ref;
-  // WhatsApp link with ref
-  const waLink = document.getElementById('vs-wa-link');
-  waLink.href = 'https://wa.me/221773632458?text=' + encodeURIComponent('Bonjour DiamanoSN, je viens de soumettre ma candidature vendeur. Boutique : ' + shopName + ' — Ref : ' + ref);
-  document.getElementById('vendorSuccessModal').classList.add('open');
-  document.body.style.overflow = 'hidden';
+function toggleVcat(el) {
+  el.classList.toggle('selected');
 }
 
 function openHelpModal() {
