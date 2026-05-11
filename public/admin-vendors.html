@@ -492,9 +492,6 @@
     </div>
 </div>
 
-<script async defer src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-app.js"></script>
-<script async defer src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-auth.js"></script>
-<script async defer src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-firestore.js"></script>
 <script>
 // Define state globally
 let currentUser = null;
@@ -502,6 +499,7 @@ let currentFilter = 'all';
 let currentApprovalData = null;
 let allVendors = [];
 let firebaseReady = false;
+let firebaseTimeout = null;
 
 // Firebase config
 const firebaseConfig = {
@@ -513,40 +511,72 @@ const firebaseConfig = {
     appId: "1:480059418031:web:bb071481468f52202e3b5a"
 };
 
-// Wait for ALL script loads to complete
-let firebaseCheckInterval = null;
-
-function checkFirebaseAndInit() {
-    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length === 0) {
-        console.log('✅ Firebase SDK loaded, initializing...');
-        clearInterval(firebaseCheckInterval);
-        initializeFirebase();
-        return;
+// Dynamically load Firebase scripts with callbacks
+function loadFirebaseSDK() {
+    console.log('📦 Loading Firebase SDK dynamically...');
+    
+    const scripts = [
+        'https://www.gstatic.com/firebaseapp/10.7.0/firebase-app.js',
+        'https://www.gstatic.com/firebaseapp/10.7.0/firebase-auth.js',
+        'https://www.gstatic.com/firebaseapp/10.7.0/firebase-firestore.js'
+    ];
+    
+    let loadedCount = 0;
+    
+    function onScriptLoad() {
+        loadedCount++;
+        console.log(`✅ Script ${loadedCount}/3 loaded`);
+        
+        if (loadedCount === 3) {
+            console.log('🎉 All Firebase scripts loaded!');
+            clearTimeout(firebaseTimeout);
+            setTimeout(initializeFirebase, 100);
+        }
     }
     
-    if (typeof firebase === 'undefined') {
-        console.log('⏳ Waiting for Firebase SDK...');
+    function onScriptError(src) {
+        console.error(`❌ Failed to load: ${src}`);
+        firebaseRetry();
     }
+    
+    scripts.forEach(src => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.type = 'text/javascript';
+        script.onload = onScriptLoad;
+        script.onerror = () => onScriptError(src);
+        document.head.appendChild(script);
+    });
+    
+    // Timeout after 20 seconds
+    firebaseTimeout = setTimeout(() => {
+        console.error('❌ Firebase CDN failed to load after 20 seconds');
+        showFirebaseError();
+    }, 20000);
 }
 
-// Start checking immediately and every 100ms
-firebaseCheckInterval = setInterval(checkFirebaseAndInit, 100);
+function firebaseRetry() {
+    console.log('🔄 Retrying Firebase load...');
+    clearTimeout(firebaseTimeout);
+    setTimeout(loadFirebaseSDK, 2000);
+}
 
-// Timeout after 20 seconds
-setTimeout(() => {
-    if (firebaseCheckInterval) {
-        clearInterval(firebaseCheckInterval);
-        console.error('❌ Firebase CDN failed to load after 20 seconds');
-        document.getElementById('vendorsContainer').innerHTML = `
+function showFirebaseError() {
+    const container = document.getElementById('vendorsContainer');
+    if (container) {
+        container.innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">❌</div>
                 <p>Erreur: Firebase CDN inaccessible</p>
-                <p style="font-size: 12px; color: #64748b;">Essayez de rafraîchir la page</p>
+                <p style="font-size: 12px; color: #64748b;">Le CDN n'est pas accessible. Essayez de rafraîchir.</p>
                 <button onclick="location.reload()" style="padding: 10px 20px; background: #dc2626; color: white; border: none; cursor: pointer; border-radius: 4px; margin-top: 10px;">Rafraîchir</button>
             </div>
         `;
     }
-}, 20000);
+}
+
+// Start loading Firebase scripts
+loadFirebaseSDK();
 
 // Define functions globally FIRST (before Firebase init)
 function filterVendors(status) {
