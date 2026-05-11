@@ -492,19 +492,39 @@
     </div>
 </div>
 
-<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-app.js" defer></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-auth.js" defer></script>
+<script src="https://www.gstatic.com/firebaseapp/10.7.0/firebase-firestore.js" defer></script>
 <script>
-// Wait for Firebase to load
-window.addEventListener('load', () => {
-    if (typeof firebase === 'undefined') {
-        console.error('❌ Firebase not loaded. Retrying...');
-        setTimeout(initializeApp, 1000);
+// Polling approach to wait for Firebase
+let firebaseRetries = 0;
+const maxRetries = 30; // 30 * 500ms = 15 seconds max wait
+
+function checkAndInitializeFirebase() {
+    if (typeof firebase !== 'undefined') {
+        console.log('✅ Firebase loaded successfully');
+        initializeApp();
         return;
     }
-    initializeApp();
-});
+    
+    firebaseRetries++;
+    if (firebaseRetries < maxRetries) {
+        console.log(`⏳ Waiting for Firebase (attempt ${firebaseRetries}/${maxRetries})...`);
+        setTimeout(checkAndInitializeFirebase, 500);
+    } else {
+        console.error('❌ Firebase failed to load after 15 seconds');
+        document.getElementById('vendorsContainer').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">❌</div>
+                <p>Erreur: Firebase ne s'est pas chargé</p>
+                <button onclick="location.reload()" style="padding: 10px 20px; background: #dc2626; color: white; border: none; cursor: pointer; border-radius: 4px; margin-top: 10px;">Rafraîchir</button>
+            </div>
+        `;
+    }
+}
+
+// Start checking for Firebase as soon as script is loaded
+checkAndInitializeFirebase();
 
 function initializeApp() {
     // Firebase Config
