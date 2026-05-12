@@ -229,21 +229,33 @@ app.use(cors({
     }
 }));
 app.use(bodyParser.json());
+
+// ✅ LOG ALL REQUESTS (BEFORE static files)
+app.use((req, res, next) => {
+    console.error(`📍 REQUEST: ${req.method} ${req.path}`);
+    next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ==========================================
 // 🔐 FIREBASE AUTH MIDDLEWARE
 // ==========================================
 const verifyFirebaseToken = async (req, res, next) => {
+    process.stdout.write('\n!!! MIDDLEWARE CALLED !!!\n');
+    console.log('🔑 Auth middleware called, headers:', Object.keys(req.headers));
     const token = req.headers.authorization?.split('Bearer ')[1];
     
+    console.log('🔍 Token:', token ? token.substring(0, 30) + '...' : 'MISSING');
+    
     if (!token) {
+        console.log('❌ Token missing');
         return res.status(401).json({ error: 'Token manquant' });
     }
 
     // 🧪 DEV MODE: Accept demo tokens for local testing
     if (token.startsWith('demo-token-')) {
-        console.log('🧪 DEV: Using demo token');
+        console.log('✅ DEV: Accepting demo token');
         req.user = {
             uid: 'demo-admin-123',
             email: 'admin@diamanosn.test',
@@ -252,12 +264,13 @@ const verifyFirebaseToken = async (req, res, next) => {
         return next();
     }
 
+    console.log('🔐 Verifying Firebase token...');
     try {
         const decodedToken = await admin.auth().verifyIdToken(token);
         req.user = decodedToken;
         next();
     } catch (error) {
-        console.error('Token verification error:', error.message);
+        console.error('❌ Token verification error:', error.message);
         return res.status(401).json({ error: 'Token invalide ou expiré' });
     }
 };
