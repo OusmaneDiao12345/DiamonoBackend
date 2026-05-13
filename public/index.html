@@ -5530,7 +5530,10 @@ function renderOrdersHistory(orders) {
       <div class="ohc-items">📦 ${o.items} article(s) · ${o.payment === 'livraison' ? '💵 À la livraison' : '📲 SenePay'} · 📍 ${o.address}</div>
       <div class="ohc-footer">
         <span class="ohc-total">${o.total}</span>
-        <button class="ohc-reorder" onclick="toast('🔄 Produits ajoutés !')">↩️ Recommander</button>
+        <div style="display:flex;gap:8px;">
+          ${o.id ? `<button class="ohc-reorder" style="background:var(--green);color:#fff;" onclick="window.location.href='order-tracking.html?id=${o.id}'">📋 Voir détails</button>` : ''}
+          <button class="ohc-reorder" onclick="toast('🔄 Produits ajoutés !')">↩️ Recommander</button>
+        </div>
       </div>
     </div>`).join('');
 }
@@ -5571,6 +5574,7 @@ function showOrders() {
         querySnapshot.forEach(doc => {
           const data = doc.data();
           orders.push({
+            id: doc.id,
             ref: data.orderRef,
             date: new Date(data.createdAt).toLocaleDateString('fr-FR', {day:'2-digit',month:'short',year:'numeric'}),
             items: data.items ? data.items.length : 0,
